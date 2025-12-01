@@ -215,6 +215,10 @@ class NumPyDnsSimulator:
             plane = self._snapshot(1)
         elif var == self.VAR_V:
             plane = self._snapshot(2)
+        else:
+            plane = self._snapshot(1)
+
+        ''' TODO
         elif var == self.VAR_ENERGY:
             # Use dns_all kinetic helper: fills ur_full[2,:,:]
             dns_all.dns_kinetic(S)
@@ -242,8 +246,7 @@ class NumPyDnsSimulator:
             else:
                 field = np.asarray(S.ur_full[2, :, :])
             plane = self._float_to_pixels(field)
-        else:
-            plane = self._snapshot(1)
+        '''
 
         return plane
 
