@@ -473,6 +473,7 @@ def main() -> None:
     sim = NumPyDnsSimulator()
     window = MainWindow(sim)
     window.adjustSize()
+    window.setFixedSize(window.size())
     screen = app.primaryScreen().availableGeometry()
     g = window.geometry()
     g.moveCenter(screen.center())
