@@ -162,5 +162,5 @@ For a terminal-only summary:
 
 ## License
 
-Copyright © Torbjörn Sjögren.
+Copyright © Mannetroll
 See the project repository for license details.
