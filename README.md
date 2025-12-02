@@ -27,7 +27,7 @@
 ## GUI Memory & CPU scalene
 
     uv pip install scalene
-    uv scalene numpy_dns_simulator.py 256 10000 10 201 0.75 cpu
+    scalene numpy_dns_simulator.py 256 10000 10 201 0.75 cpu
 
 ## CLI Memory & CPU scalene
 
