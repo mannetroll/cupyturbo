@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "cupyturbo"
 version = "0.1.0"
@@ -11,4 +15,12 @@ dependencies = [
     "numpy>=2.0.0",
     "imageio",
     "pyqt6",
+]
+
+[tool.setuptools]
+py-modules = [
+    "numpy_dns_main",
+    "numpy_dns_simulator",
+    "numpy_dns_wrapper",
+    "gpu_test",
 ]
