@@ -228,6 +228,9 @@ class DnsState:
     om2: any = None         # shape (NZ, NX_half), complex
     fnm1: any = None        # shape (NZ, NX_half), complex
 
+    scratch1: any = None
+    scratch2: any = None
+
     def sync(self):
         """For a CuPy backend, force synchronization at convenient checkpoints."""
         if self.backend == "gpu":
@@ -308,6 +311,9 @@ def create_dns_state(
     state.dt = 0.0
     state.cn = 1.0
     state.cnm1 = 0.0
+
+    state.scratch1 = xp.zeros((NZ, NX_half), dtype=xp.complex64)
+    state.scratch2 = xp.zeros((NZ, NX_half), dtype=xp.complex64)
 
     return state
 
@@ -880,8 +886,10 @@ def dns_step3(S: DnsState) -> None:
     om = S.om2  # updated vorticity, shape (NZ, NX_half)
 
     # Prepare output buffers for low-k band UC(.,Z,1:2)
-    out1 = xp.zeros_like(om)  # (NZ, NX_half), complex64
-    out2 = xp.zeros_like(om)
+    out1 = S.scratch1
+    out2 = S.scratch2
+    out1[...] = 0
+    out2[...] = 0
 
     # Common gamma grid
     gz2d = gamma_1d[:, None]  # (NZ, 1)
