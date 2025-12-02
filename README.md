@@ -11,14 +11,20 @@
     uv pip install cupy
     uv run python -c "import cupy as cp; x = cp.arange(5); print(x, x.device)"
 
-## Profile
+## cProfile
 
     python -m cProfile -o dns.prof numpy_dns_simulator.py 256 10000 10 301 0.75 cpu
     python -m pstats dns.prof
     dns.prof% sort time
     dns.prof% stats 20
 
-## GUI
+## GUI snakeviz
 
     uv pip install snakeviz
     snakeviz dns.prof
+
+
+## Memory & CPU scalene
+
+    uv pip install scalene
+    uv scalene numpy_dns_simulator.py 256 10000 10 201 0.75 cpu
