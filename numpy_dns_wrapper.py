@@ -152,8 +152,8 @@ class NumPyDnsSimulator:
 
         Used to emulate the old Fortran FIELD2PIX / dns_frame behavior.
         """
-        fmin = float(field.min())
-        fmax = float(field.max())
+        fmin = -3 #float(field.min())
+        fmax =  3 #float(field.max())
         rng = fmax - fmin
 
         if abs(rng) <= 1.0e-12:
