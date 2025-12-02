@@ -1,5 +1,5 @@
 """
-dns_all.py — 2D Homogeneous Turbulence DNS (NumPy / CuPy port)
+numpy_dns_simulator.py — 2D Homogeneous Turbulence DNS (NumPy / CuPy port)
 
 This is a structural port of dns_all.cu to Python.
 
@@ -1216,7 +1216,6 @@ def dump_field_as_pgm_full(S: DnsState, comp: int, filename: str) -> None:
 # ---------------------------------------------------------------------------
 # Main driver (Python version of main in dns_all.cu)
 # ---------------------------------------------------------------------------
-
 def run_dns(
     N: int = 8,
     Re: float = 100,

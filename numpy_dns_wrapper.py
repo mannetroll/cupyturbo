@@ -1,4 +1,4 @@
-# fortran_dns_min.py
+# numpy_dns_wrapper.py
 from __future__ import annotations
 
 from pathlib import Path
