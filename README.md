@@ -32,3 +32,4 @@
 ## CLI Memory & CPU scalene
 
      scalene --cli --cpu numpy_dns_simulator.py --- 256 10000 10 201 0.75 cpu
+
