@@ -34,7 +34,7 @@ import time
 import math
 import sys
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import Literal
 
 import numpy as _np
 
@@ -85,13 +85,13 @@ def get_xp(backend: Literal["cpu", "gpu", "auto"] = "auto"):
         if _cp is not None:
             try:
                 # Touch CUDA runtime to ensure a device is actually usable
-                print(f" Checking GPU device")
-                dev = _cp.cuda.Device() # may raise if no GPU
+                print(" Checking GPU device")
+                dev = _cp.cuda.Device()  # may raise if no GPU
                 print(f" Using GPU device: {dev.id}")
                 return _cp
             except Exception:
+                print(" Exception...")
                 pass
-                print(f" Exception...")
         return _np
 
     # Explicit GPU / CPU selection
@@ -132,7 +132,7 @@ class Frand:
 # ===============================================================
 # Python equivalent of dnsCudaDumpUCFullCsv
 # ===============================================================
-def dump_uc_full_csv(S: DnsState, UC_full, comp: int):
+def dump_uc_full_csv(S: "DnsState", UC_full, comp: int):
     """
     CSV dumper compatible with step2a_debug.py, but for SoA layout:
 
@@ -589,7 +589,7 @@ def vfft_full_inverse_uc_full_to_ur_full(S: DnsState) -> None:
     UC = S.uc_full
 
     # 1) inverse along z
-    tmp = xp.fft.ifft(UC, axis=1)                   # (3, NZ_full, NK_full), complex
+    tmp = xp.fft.ifft(UC, axis=1)  # (3, NZ_full, NK_full), complex
 
     # 2) inverse along x (real side)
     ur_full = xp.fft.irfft(tmp, n=S.NX_full, axis=2)  # (3, NZ_full, NX_full), real
@@ -606,15 +606,18 @@ def vfft_full_forward_ur_full_to_uc_full(S: DnsState) -> None:
       2) FFT along z           (complex → complex)
     """
     xp = S.xp
-    UR = S.ur_full.astype(xp.float32)
+
+    # S.ur_full is already float32
+    UR = S.ur_full
 
     # 1) real FFT along x
-    tmp = xp.fft.rfft(UR, axis=2)                   # (3, NZ_full, NK_full), complex
+    tmp = xp.fft.rfft(UR, axis=2)  # (3, NZ_full, NK_full), complex64
 
     # 2) FFT along z
-    UC = xp.fft.fft(tmp, axis=1)                    # (3, NZ_full, NK_full), complex
+    UC = xp.fft.fft(tmp, axis=1)   # (3, NZ_full, NK_full), complex128
 
-    S.uc_full[...] = UC.astype(xp.complex64)
+    # Assign back; uc_full is complex64, assignment will down-cast
+    S.uc_full[...] = UC
 
 
 # ---------------------------------------------------------------------------
@@ -718,22 +721,19 @@ def dns_step2b(S: DnsState) -> None:
     #   UR(:,:,1) = u*u  → comp 0
     #   UR(:,:,2) = w*w  → comp 1
     # ------------------------------------------------------------------
-    u = UR[0, :, :]   # component 1 in Fortran
-    w = UR[1, :, :]   # component 2 in Fortran
+    u = UR[0]   # (NZ_full, NX_full)
+    w = UR[1]   # (NZ_full, NX_full)
 
-    UR[2, :, :] = u * w   # u * w
-    UR[0, :, :] = u * u   # u^2
-    UR[1, :, :] = w * w   # w^2
+    # Use in-place multiplies to avoid temporaries
+    xp.multiply(u, w, out=UR[2])  # u * w
+    xp.multiply(u, u, out=UR[0])  # u^2
+    xp.multiply(w, w, out=UR[1])  # w^2
 
     # ------------------------------------------------------------------
     # 2) Full-grid forward FFT: UR_full → UC_full (3 components)
     #
     # CUDA version calls:
     #   vfft_full_forward_ur_full_to_uc_full(S)
-    #
-    # which performs:
-    #   • R2C in X for each component
-    #   • C2C (forward) in Z for each component
     # ------------------------------------------------------------------
     vfft_full_forward_ur_full_to_uc_full(S)
 
@@ -973,9 +973,6 @@ def dns_step3(S: DnsState) -> None:
 
 # ===============================================================
 # STEP2A core (dealias + reshuffle + inverse FFT)
-# ===============================================================
-# ===============================================================
-# STEP2A core (dealias + reshuffle + inverse FFT)
 #   Python/CuPy version of dnsCudaStep2A_full
 #   Operates on S.uc_full (3, NZ_full, NK_full) and S.ur_full.
 # ===============================================================
@@ -1008,7 +1005,6 @@ def dns_step2a(S: DnsState) -> None:
     # 1) Dealias high-kx modes for comp 0,1
     #    (k_step2a_full_zero_highkx)
     #    In CUDA: high kx region [N/2 .. 3N/4] is zeroed.
-    #    Here kx index is axis=2 (NK_full).
     # ----------------------------------------------------------
     nx_start = N // 2           # N/2
     nx_end   = 3 * N // 4       # 3N/4
@@ -1021,32 +1017,30 @@ def dns_step2a(S: DnsState) -> None:
 
     # ----------------------------------------------------------
     # 2) Z-reshuffle low-kz strip (Fortran STEP2A-style)
-    #    (k_step2a_full_reshuffle_z)
     #
-    #    Debug version did this on UC_full[kx, z, comp].
-    #    Here our layout is UC[comp, z, kx], so we reshuffle
-    #    along axis=1 (z) for kx<halfN.
+    # For the 3/2 grid (NZ_full = 3N/2) this is a contiguous block move:
+    #
+    #   z_mid = N/2 .. N-1
+    #   z_top = N   .. 3N/2-1
+    #
+    # and only for kx < min(N/2, NK_full).
     # ----------------------------------------------------------
     halfN = N // 2
     k_max = min(halfN, NK_full)
 
-    for z_low in range(halfN):
-        z_mid = z_low + halfN
-        z_top = z_low + N
-        if z_top >= NZ_full:
-            break
+    if k_max > 0:
+        z_mid_start = halfN
+        z_mid_end   = halfN + halfN    # == N
+        z_top_start = N
+        z_top_end   = N + halfN        # == 3N/2 == NZ_full
 
-        for c in range(2):  # components 0,1
-            # copy UC[c, z_mid, :k_max] → UC[c, z_top, :k_max]
-            slice_mid = UC[c, z_mid, :k_max].copy()
-            UC[c, z_top, :k_max] = slice_mid
-            UC[c, z_mid, :k_max] = xp.complex64(0.0 + 0.0j)
+        # Copy UC[c, z_mid, 0:k_max] -> UC[c, z_top, 0:k_max] for c=0,1
+        UC[0:2, z_top_start:z_top_end, :k_max] = UC[0:2, z_mid_start:z_mid_end, :k_max]
+        # Zero the middle strip
+        UC[0:2, z_mid_start:z_mid_end, :k_max] = xp.complex64(0.0 + 0.0j)
 
     # ----------------------------------------------------------
     # 3) Inverse FFT along Z (complex→complex) IN-PLACE on UC
-    #
-    # CUDA:
-    #   cufftExecC2C(plan_z, uc_comp, uc_comp, CUFFT_INVERSE)
     #
     # CUFFT does NOT scale the inverse; NumPy/CuPy ifft DOES
     # include 1/NZ_full, so we multiply by NZ_full to match.
@@ -1057,14 +1051,8 @@ def dns_step2a(S: DnsState) -> None:
     # ----------------------------------------------------------
     # 4) Inverse FFT along X (complex→real) to UR_full
     #
-    # CUDA:
-    #   cufftExecC2R(plan_x, uc_comp, ur_comp)
-    #
-    # X is axis=2 (kx). We use irfft along axis=2:
-    #   (3, NZ_full, NK_full) -> (3, NZ_full, NX_full)
-    #
-    # NumPy/CuPy irfft also includes 1/NX_full scaling, so we
-    # multiply by NX_full to match CUFFT.
+    # irfft includes 1/NX_full scaling, so we multiply by NX_full
+    # to match CUFFT.
     # ----------------------------------------------------------
     ur_full = xp.fft.irfft(UC, n=NX_full, axis=2) * NX_full
     S.ur_full[...] = ur_full.astype(xp.float32)
@@ -1118,7 +1106,6 @@ def next_dt(S: DnsState) -> None:
         CN   = 0.8 + 0.2 * CFLNUM / CFL
         DT   = DT * CN
     """
-    xp = S.xp
     PI = math.pi
 
     CFLM = compute_cflm(S)
@@ -1236,9 +1223,6 @@ def run_dns(
     print(f" effective = {S.backend} (xp = {'cupy' if S.backend == 'gpu' else 'numpy'})")
 
     dns_step2a(S)
-    #print("\nAfter: dnsCudaStep2A")
-    #dump_uc_full_csv(S, S.uc_full, 0)
-    #dump_uc_full_csv(S, S.uc_full, 1)
 
     # ----------------------------------------
     # Match CUDA's NEXTDT INIT behaviour
@@ -1262,27 +1246,15 @@ def run_dns(
 
         # STEP2B
         dns_step2b(S)
-        #print("\nAfter: dns_step2b")
-        #dump_uc_full_csv(S, S.uc_full, 0)
-        #dump_uc_full_csv(S, S.uc_full, 1)
 
         # STEP3
         dns_step3(S)
-        #print("\nAfter: dns_step3")
-        #dump_uc_full_csv(S, S.uc_full, 0)
-        #dump_uc_full_csv(S, S.uc_full, 1)
 
         # STEP2A
         dns_step2a(S)
-        #print("\nAfter: dns_step2a")
-        #dump_uc_full_csv(S, S.uc_full, 0)
-        #dump_uc_full_csv(S, S.uc_full, 1)
 
         # NEXTDT: updates S.cn and S.dt (dt_new)
         next_dt(S)
-        #print("\nAfter: next_dt")
-        #dump_uc_full_csv(S, S.uc_full, 0)
-        #dump_uc_full_csv(S, S.uc_full, 1)
 
         # Advance time with *old* dt, like CUDA/Fortran
         S.t += dt_old
@@ -1307,7 +1279,7 @@ def run_dns(
 def main():
     #
     #   dns_all N Re K0 STEPS CFL auto
-    #   $ python dns_all.py 256 10000 10 301 0.75 cpu
+    #   $ python numpy_dns_simulator.py 256 10000 10 301 0.75 cpu
     #
     args = sys.argv[1:]
     N = int(args[0]) if len(args) > 0 else 256
@@ -1322,6 +1294,7 @@ def main():
         BACK = "auto"
 
     run_dns(N=N, Re=Re, K0=K0, STEPS=STEPS, CFL=CFL, backend=BACK)
+
 
 if __name__ == "__main__":
     main()
