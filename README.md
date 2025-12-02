@@ -31,4 +31,9 @@
 
 ## CLI Memory & CPU scalene
 
-     scalene --cli --cpu numpy_dns_simulator.py --- 256 10000 10 201 0.75 cpu
+    scalene --cli --cpu numpy_dns_simulator.py --- 256 10000 10 201 0.75 cpu
+
+## Win11 GPU
+
+    PS C:\Windows\system32> tasklist | findstr python
+    PS C:\Windows\system32> nvidia-smi -l 1
