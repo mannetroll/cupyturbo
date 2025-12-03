@@ -40,6 +40,9 @@ From a cloned repo:
 
 The main entry point is `numpy_dns_main.py`.
 
+![DNS Viewer Window](https://github.com/mannetroll/cupyturb/raw/main/window.png)
+
+
 ### Quick start (CPU)
 
     uv sync

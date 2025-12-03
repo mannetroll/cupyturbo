@@ -1209,6 +1209,175 @@ def dump_field_as_pgm_full(S: DnsState, comp: int, filename: str) -> None:
           f"comp={comp}, min={minv:g}, max={maxv:g})")
 
 # ---------------------------------------------------------------------------
+# Helpers for visualization fields (energy, vorticity, streamfunction)
+# These are Python/xp equivalents of:
+#   FIELD2KIN  + DNS_KINETIC
+#   OM2PHYS    + DNS_OM2PHYS
+#   STREAMFUNC + DNS_STREAMFUNC
+#
+# They follow the "dns_all" convention used by your GUI:
+#   - dns_kinetic(S)     → fills S.ur_full[2, :, :] with |u|
+#   - dns_om2_phys(S)    → fills S.ur_full[2, :, :] with ω(x,z)
+#   - dns_stream_func(S) → fills S.ur_full[2, :, :] with φ(x,z)
+#
+# The GUI then does:
+#     dns_all.dns_kinetic(S)
+#     field = (cp.asnumpy or np.asarray)(S.ur_full[2, :, :])
+#     plane = self._float_to_pixels(field)
+# ---------------------------------------------------------------------------
+
+
+def dns_kinetic(S: DnsState) -> None:
+    """
+    Fill S.ur_full[2, :, :] with the kinetic-energy magnitude |u|.
+
+    Fortran FIELD2KIN computes:
+        K = sqrt(UR(:,:,1)^2 + UR(:,:,2)^2)
+
+    Here we compute the same quantity on the full 3/2 grid:
+        ur_full[0] → u, ur_full[1] → w
+        ur_full[2] ← sqrt(u^2 + w^2)
+    """
+    xp = S.xp
+
+    u = S.ur_full[0, :, :]  # component 1
+    w = S.ur_full[1, :, :]  # component 2
+
+    ke = xp.sqrt(u * u + w * w)
+    S.ur_full[2, :, :] = ke.astype(xp.float32)
+
+
+def _spectral_band_to_phys_full_grid(S: DnsState, band) -> any:
+    """
+    Internal helper: take a compact spectral band band(z, kx) with
+    shape (NZ, NX/2) and map it to a full 3/2-grid physical field
+    using the same de-aliasing + reshuffle + inverse FFT sequence
+    as STEP2A / OM2PHYS / STREAMFUNC.
+
+    Returns a real array of shape (NZ_full, NX_full), dtype float32.
+    """
+    xp = S.xp
+
+    N       = S.Nbase
+    NX_full = S.NX_full      # 3*N/2
+    NZ_full = S.NZ_full      # 3*N/2
+    NK_full = S.NK_full      # 3*N/4 + 1
+
+    NX_half = N // 2
+    NZ      = N
+
+    # 2D spectral buffer: layout [z, kx]
+    uc_tmp = xp.zeros((NZ_full, NK_full), dtype=xp.complex64)
+
+    # Copy compact band into low-k strip (Z=0..NZ-1, kx=0..NX/2-1)
+    uc_tmp[:NZ, :NX_half] = band
+
+    # ----------------------------------------------------------
+    # Dealias high-kx: zero band [N/2 .. 3N/4] as in STEP2A
+    # ----------------------------------------------------------
+    hi_start = N // 2
+    hi_end   = min(3 * N // 4, NK_full - 1)
+    if hi_start <= hi_end:
+        uc_tmp[:, hi_start:hi_end + 1] = xp.complex64(0.0 + 0.0j)
+
+    # ----------------------------------------------------------
+    # Z-reshuffle low-kz strip (STEP2A-style)
+    #   for z_low = 0..N/2-1:
+    #       z_mid = z_low + N/2
+    #       z_top = z_low + N
+    # ----------------------------------------------------------
+    halfN = N // 2
+    k_max = min(halfN, NK_full)
+
+    for z_low in range(halfN):
+        z_mid = z_low + halfN
+        z_top = z_low + N
+        if z_top >= NZ_full:
+            break
+
+        slice_mid = uc_tmp[z_mid, :k_max].copy()
+        uc_tmp[z_top, :k_max] = slice_mid
+        uc_tmp[z_mid, :k_max] = xp.complex64(0.0 + 0.0j)
+
+    # Zero the "middle" Fourier coefficient Z = NZ+1 (1-based)
+    z_mid = NZ  # 0-based index
+    if z_mid < NZ_full:
+        uc_tmp[z_mid, :NX_half] = xp.complex64(0.0 + 0.0j)
+
+    # ----------------------------------------------------------
+    # Inverse transforms (match CUFFT scaling used elsewhere):
+    #   1) inverse along z  (complex→complex)
+    #   2) inverse along x  (complex→real)
+    # ----------------------------------------------------------
+    tmp  = xp.fft.ifft(uc_tmp, axis=0) * NZ_full           # (NZ_full, NK_full)
+    phys = xp.fft.irfft(tmp, n=NX_full, axis=1) * NX_full  # (NZ_full, NX_full)
+
+    return phys.astype(xp.float32)
+
+
+def dns_om2_phys(S: DnsState) -> None:
+    """
+    Fill S.ur_full[2, :, :] with the physical vorticity ω(x,z).
+
+    Fortran OM2PHYS does:
+      - insert OM2 into UC(:,:,3)
+      - de-alias + reshuffle
+      - VCFFTB + VRFFTB → UR(:,:,3)
+
+    Here we:
+      - start from S.om2 (shape NZ × NX/2)
+      - map that spectral band to a full 3/2-grid physical field
+      - store in S.ur_full[2, :, :]
+    """
+    xp = S.xp
+
+    # S.om2 has shape (NZ, NX_half) with NZ = Nbase
+    band = S.om2
+    phys = _spectral_band_to_phys_full_grid(S, band)
+
+    S.ur_full[2, :, :] = phys
+
+
+def dns_stream_func(S: DnsState) -> None:
+    """
+    Fill S.ur_full[2, :, :] with the streamfunction φ(x,z).
+
+    Fortran STREAMFUNC does:
+      - φ̂(X,Z) = OM2(X,Z) / (ALFA(X)^2 + GAMMA(Z)^2 + 1e-30)
+      - insert φ̂ into UC(:,:,4)
+      - de-alias + reshuffle
+      - inverse 2D FFT → UR(:,:,4)
+
+    Here we:
+      - build K2 on the compact grid (NZ × NX/2)
+      - φ̂ = OM2 / (K2 + 1e-30)
+      - map φ̂ via the same spectral → physical helper
+      - store result in S.ur_full[2, :, :].
+    """
+    xp = S.xp
+
+    N       = S.Nbase
+    NX_half = N // 2
+    NZ      = N
+
+    # 1D wavenumber vectors
+    alfa_1d  = S.alfa.astype(xp.float32)   # (NX_half,)
+    gamma_1d = S.gamma.astype(xp.float32)  # (NZ,)
+
+    ax = alfa_1d[None, :]                  # (1, NX_half)
+    gz = gamma_1d[:, None]                 # (NZ, 1)
+
+    K2 = ax * ax + gz * gz                 # (NZ, NX_half)
+    K2 = K2 + xp.float32(1.0e-30)          # avoid divide-by-zero
+
+    # Spectral streamfunction φ̂
+    phi_hat = S.om2 / K2                   # (NZ, NX_half), complex
+
+    # Map to physical 3/2 grid and store in ur_full[2]
+    phys = _spectral_band_to_phys_full_grid(S, phi_hat)
+    S.ur_full[2, :, :] = phys
+
+# ---------------------------------------------------------------------------
 # Main driver (Python version of main in dns_all.cu)
 # ---------------------------------------------------------------------------
 def run_dns(

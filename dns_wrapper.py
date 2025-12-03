@@ -15,7 +15,6 @@ class NumPyDnsSimulator:
     DnsSimulator side is assumed to expose:
       - dns_init(n, re, k0)
       - dns_step(t, dt, cn)
-      - dns_frame(px, py, comp)
       - dns_kinetic(px, py)
       - dns_om2phys(px, py)
       - dns_streamfunc(px, py)
@@ -29,7 +28,7 @@ class NumPyDnsSimulator:
     VAR_OMEGA = 3       # currently mapped to U (TODO)
     VAR_STREAM = 4      # currently mapped to U (TODO)
 
-    def __init__(self, n: int = 256, re: float = 10000.0, k0: float = 15.0):
+    def __init__(self, n: int = 256, re: float = 10000.0, k0: float = 10.0):
         self.n = int(n)
         self.m = 3 * self.n
         self.re = float(re)
@@ -149,11 +148,9 @@ class NumPyDnsSimulator:
     def _float_to_pixels(self, field: np.ndarray) -> np.ndarray:
         """
         Map a float field to 8-bit grayscale [1,255], like the PGM dumper.
-
-        Used to emulate the old Fortran FIELD2PIX / dns_frame behavior.
         """
-        fmin = -3 #float(field.min())
-        fmax =  3 #float(field.max())
+        fmin = float(field.min())
+        fmax = float(field.max())
         rng = fmax - fmin
 
         if abs(rng) <= 1.0e-12:
@@ -170,7 +167,6 @@ class NumPyDnsSimulator:
     def _snapshot(self, comp: int) -> np.ndarray:
         """
         Raw snapshot from Fortran, now using dns_frame with 3× scale-up.
-        comp is currently ignored on the Fortran side.
         """
         # For the pure-Python solver, we take component 'comp' from ur_full:
         #   comp = 1,2,3  → ur_full[0,1,2]
@@ -215,10 +211,6 @@ class NumPyDnsSimulator:
             plane = self._snapshot(1)
         elif var == self.VAR_V:
             plane = self._snapshot(2)
-        else:
-            plane = self._snapshot(1)
-
-        ''' TODO
         elif var == self.VAR_ENERGY:
             # Use dns_all kinetic helper: fills ur_full[2,:,:]
             dns_all.dns_kinetic(S)
@@ -246,7 +238,8 @@ class NumPyDnsSimulator:
             else:
                 field = np.asarray(S.ur_full[2, :, :])
             plane = self._float_to_pixels(field)
-        '''
+        else:
+            plane = self._snapshot(1)
 
         return plane
 
