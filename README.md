@@ -156,6 +156,13 @@ For a terminal-only summary:
 - `cupyturbo/gpu_test.py`  
   Simple CuPy test script to verify GPU availability and basic performance.
 
+## one-liner
+
+```
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv cache clean mannetroll-cupyturbo
+uv run --with mannetroll-cupyturbo==0.1.0 python -m cupyturbo.dns_main
+```
 
 ## License
 
