@@ -43,14 +43,13 @@ From a cloned repo:
 ### Quick start (CPU)
 
     uv sync
-    uv run python -m build
     uv run python -m cupyturbo.dns_main
 
 This runs with default parameters (e.g. N=256, Re=10000, a default number of steps, CPU backend).
 
 ### Full CLI
 
-    python cupyturbo/dns_main.py N Re K0 STEPS CFL BACKEND
+    python -m cupyturbo.dns_simulator N Re K0 STEPS CFL BACKEND
 
 Where:
 
@@ -64,10 +63,10 @@ Where:
 Examples:
 
     # CPU run (NumPy)
-    python cupyturbo/dns_main.py 256 10000 10 1001 0.75 cpu
+    python -m cupyturbo.dns_simulator 256 10000 10 1001 0.75 cpu
 
     # Auto-select backend (GPU if CuPy + CUDA are available)
-    python cupyturbo/dns_main.py 256 10000 10 1001 0.75 auto
+    python -m cupyturbo.dns_simulator 256 10000 10 1001 0.75 auto
 
 
 ## Enabling GPU with CuPy (CUDA)
