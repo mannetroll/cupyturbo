@@ -2,7 +2,7 @@
 
 ## Run
 
-     uv run python numpy_dns_main.py
+     uv run python dns_main.py
 
 ## Install CUDA (RTX 3090)
 
@@ -13,7 +13,7 @@
 
 ## cProfile
 
-    python -m cProfile -o dns.prof numpy_dns_simulator.py 256 10000 10 301 0.75 cpu
+    python -m cProfile -o dns.prof dns_simulator.py 256 10000 10 301 0.75 cpu
     python -m pstats dns.prof
     dns.prof% sort time
     dns.prof% stats 20
@@ -27,9 +27,9 @@
 ## GUI Memory & CPU scalene
 
     uv pip install scalene
-    scalene numpy_dns_simulator.py 256 10000 10 201 0.75 cpu
+    scalene dns_simulator.py 256 10000 10 201 0.75 cpu
 
 ## CLI Memory & CPU scalene
 
-     scalene --cli --cpu numpy_dns_simulator.py --- 256 10000 10 201 0.75 cpu
+     scalene --cli --cpu dns_simulator.py --- 256 10000 10 201 0.75 cpu
 

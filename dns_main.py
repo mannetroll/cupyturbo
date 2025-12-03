@@ -1,4 +1,4 @@
-# numpy_dns_main.py
+# dns_main.py
 import time
 import sys
 from typing import Optional
@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QStatusBar,
 )
 
-from numpy_dns_wrapper import NumPyDnsSimulator
+from dns_wrapper import NumPyDnsSimulator
 
 import numpy as np
 

@@ -1,5 +1,5 @@
 """
-numpy_dns_simulator.py — 2D Homogeneous Turbulence DNS (NumPy / CuPy port)
+dns_simulator.py — 2D Homogeneous Turbulence DNS (NumPy / CuPy port)
 
 This is a structural port of dns_all.cu to Python.
 
@@ -1456,7 +1456,7 @@ def run_dns(
 def main():
     #
     #   dns_all N Re K0 STEPS CFL auto
-    #   $ python numpy_dns_simulator.py 256 10000 10 301 0.75 cpu
+    #   $ python dns_simulator.py 256 10000 10 301 0.75 cpu
     #
     args = sys.argv[1:]
     N = int(args[0]) if len(args) > 0 else 256

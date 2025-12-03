@@ -19,8 +19,8 @@ dependencies = [
 
 [tool.setuptools]
 py-modules = [
-    "numpy_dns_main",
-    "numpy_dns_simulator",
-    "numpy_dns_wrapper",
+    "dns_main",
+    "dns_simulator",
+    "dns_wrapper",
     "gpu_test",
 ]
