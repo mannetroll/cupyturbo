@@ -273,7 +273,7 @@ class MainWindow(QMainWindow):
         self.status.setFont(mono)
 
         self.threads_label = QLabel(self)
-        #self._update_threads_label()
+        self._update_threads_label()
         self.status.addPermanentWidget(self.threads_label)
 
         # Timer-based simulation (no QThread)
@@ -314,7 +314,7 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------------
     def on_start_clicked(self) -> None:
-        #self._update_threads_label()
+        self._update_threads_label()
         if not self.timer.isActive():
             self.timer.start()
 
@@ -447,6 +447,9 @@ class MainWindow(QMainWindow):
         txt = f"FPS: {fps_str} | Iter: {it:5d} | T: {t:6.3f}"
         self.status.showMessage(txt)
 
+    def _update_threads_label(self) -> None:
+        text = f"Copyright © Mannetroll"
+        self.threads_label.setText(text)
 
     # ------------------------------------------------------------------
     def keyPressEvent(self, event) -> None:
