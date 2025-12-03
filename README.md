@@ -141,10 +141,10 @@ For a terminal-only summary:
 ## Project layout (key modules)
 
 - `cupyturbo/dns_main.py`  
-  CLI entry point; sets up the DNS state and runs the time loop.
+  PyQt6 GUI viewer; displays DNS fields (U, V, ω, kinetic) in real time.
 
 - `cupyturbo/dns_simulator.py`  
-  Core DNS implementation:
+  Headless CLI DNS solver:
   - PAO initialization (dns_pao_host_init)
   - FFT helpers (vfft_full_*)
   - STEP2A, STEP2B, STEP3
