@@ -291,7 +291,7 @@ class MainWindow(QMainWindow):
         self.cmap_combo.currentTextChanged.connect(self.on_cmap_changed)
 
         # window setup
-        self.setWindowTitle("2D Turbulent DNS (NumPy)")
+        self.setWindowTitle("2D Homogeneous Turbulence (NumPy)")
         self.resize(self.sim.px + 40, self.sim.py + 120)
 
         self._last_pixels_rgb: Optional[np.ndarray] = None
