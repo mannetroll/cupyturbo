@@ -12,8 +12,8 @@ authors = [
 
 dependencies = [
     "numpy>=2.0.0",
-    "imageio",
-    "pyqt6",
+    "pillow>=10.0",
+    "pyqt6>=6.7",
 ]
 
 # Optional GPU extra
