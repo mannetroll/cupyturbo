@@ -38,7 +38,7 @@ From a cloned repo:
 
 ## Running the DNS
 
-The main entry point is `numpy_dns_main.py`.
+The main entry point is `dns_main.py`.
 
 ![DNS Viewer Window](https://github.com/mannetroll/cupyturbo/blob/main/window.png?raw=true)
 
@@ -46,13 +46,13 @@ The main entry point is `numpy_dns_main.py`.
 ### Quick start (CPU)
 
     uv sync
-    uv run python numpy_dns_main.py
+    uv run python dns_main.py
 
 This runs with default parameters (e.g. N=256, Re=10000, a default number of steps, CPU backend).
 
 ### Full CLI
 
-    python numpy_dns_main.py N Re K0 STEPS CFL BACKEND
+    python dns_main.py N Re K0 STEPS CFL BACKEND
 
 Where:
 
@@ -66,10 +66,10 @@ Where:
 Examples:
 
     # CPU run (NumPy)
-    python numpy_dns_main.py 256 10000 10 1001 0.75 cpu
+    python dns_main.py 256 10000 10 1001 0.75 cpu
 
     # Auto-select backend (GPU if CuPy + CUDA are available)
-    python numpy_dns_main.py 256 10000 10 1001 0.75 auto
+    python dns_main.py 256 10000 10 1001 0.75 auto
 
 
 ## Enabling GPU with CuPy (CUDA)
@@ -91,19 +91,18 @@ On a CUDA machine (e.g. RTX 3090):
 
 4. Run in GPU mode:
 
-       uv run python numpy_dns_main.py 256 10000 10 1001 0.75 gpu
+       uv run python dns_main.py 256 10000 10 1001 0.75 gpu
 
 Or let the backend auto-detect:
 
-       uv run python numpy_dns_main.py 256 10000 10 1001 0.75 auto
+       uv run python dns_main.py 256 10000 10 1001 0.75 auto
 
 
 ## Profiling
 
 ### cProfile (CPU)
 
-    python -m cProfile -o dns.prof \
-        numpy_dns_simulator.py 256 10000 10 301 0.75 cpu
+    python -m cProfile -o dns.prof dns_simulator.py 256 10000 10 301 0.75 cpu
 
 Inspect the results:
 
@@ -132,31 +131,31 @@ Install Scalene:
 
 Run with GUI report:
 
-    scalene numpy_dns_simulator.py 256 10000 10 201 0.75 cpu
+    scalene dns_simulator.py 256 10000 10 201 0.75 cpu
 
 
 ### Memory & CPU profiling with Scalene (CLI only)
 
 For a terminal-only summary:
 
-    scalene --cli --cpu numpy_dns_simulator.py -- 256 10000 10 201 0.75 cpu
+    scalene --cli --cpu dns_simulator.py -- 256 10000 10 201 0.75 cpu
 
 (Note: the `--` separates Scalene’s own options from the script arguments.)
 
 
 ## Project layout (key modules)
 
-- `numpy_dns_main.py`  
+- `dns_main.py`  
   CLI entry point; sets up the DNS state and runs the time loop.
 
-- `numpy_dns_simulator.py`  
+- `dns_simulator.py`  
   Core DNS implementation:
   - PAO initialization (dns_pao_host_init)
   - FFT helpers (vfft_full_*)
   - STEP2A, STEP2B, STEP3
   - CFL-based time-step control (compute_cflm, next_dt)
 
-- `numpy_dns_wrapper.py`  
+- `dns_wrapper.py`  
   Thin wrapper for programmatic use.
 
 - `gpu_test.py`  
