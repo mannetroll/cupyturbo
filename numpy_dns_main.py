@@ -301,8 +301,8 @@ class MainWindow(QMainWindow):
         self._sim_start_iter = self.sim.get_iteration()
 
         # initial draw (omega mode)
-        self.variable_combo.setCurrentIndex(0)
-        self.sim.set_variable(self.sim.VAR_U)
+        self.variable_combo.setCurrentIndex(3)
+        self.sim.set_variable(self.sim.VAR_OMEGA)
 
         # (optional) a nice colormap index
         self.cmap_combo.setCurrentIndex(5)
