@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QStatusBar,
 )
 
-from dns_wrapper import NumPyDnsSimulator
+from cupyturbo.dns_wrapper import NumPyDnsSimulator
 
 import numpy as np
 

@@ -38,21 +38,19 @@ From a cloned repo:
 
 ## Running the DNS
 
-The main entry point is `dns_main.py`.
-
 ![DNS Viewer Window](https://raw.githubusercontent.com/mannetroll/cupyturbo/main/window.png)
-
 
 ### Quick start (CPU)
 
     uv sync
-    uv run python dns_main.py
+    uv run python -m build
+    uv run python -m cupyturbo.dns_main
 
 This runs with default parameters (e.g. N=256, Re=10000, a default number of steps, CPU backend).
 
 ### Full CLI
 
-    python dns_main.py N Re K0 STEPS CFL BACKEND
+    python cupyturbo/dns_main.py N Re K0 STEPS CFL BACKEND
 
 Where:
 
@@ -66,10 +64,10 @@ Where:
 Examples:
 
     # CPU run (NumPy)
-    python dns_main.py 256 10000 10 1001 0.75 cpu
+    python cupyturbo/dns_main.py 256 10000 10 1001 0.75 cpu
 
     # Auto-select backend (GPU if CuPy + CUDA are available)
-    python dns_main.py 256 10000 10 1001 0.75 auto
+    python cupyturbo/dns_main.py 256 10000 10 1001 0.75 auto
 
 
 ## Enabling GPU with CuPy (CUDA)
@@ -91,22 +89,22 @@ On a CUDA machine (e.g. RTX 3090):
 
 4. Run in GPU mode:
 
-       uv run python dns_main.py 256 10000 10 1001 0.75 gpu
+       uv run python -m cupyturbo.dns_simulator 256 10000 10 1001 0.75 gpu
 
 Or let the backend auto-detect:
 
-       uv run python dns_main.py 256 10000 10 1001 0.75 auto
+       uv run python -m cupyturbo.dns_simulator 256 10000 10 1001 0.75 auto
 
 
 ## Profiling
 
 ### cProfile (CPU)
 
-    python -m cProfile -o dns.prof dns_simulator.py 256 10000 10 301 0.75 cpu
+    python -m cProfile -o dns_simulator.prof -m cupyturbo.dns_simulator    
 
 Inspect the results:
 
-    python -m pstats dns.prof
+    python -m pstats dns_simulator.prof
     # inside pstats:
     sort time
     stats 20
@@ -120,7 +118,7 @@ Install SnakeViz:
 
 Visualize the profile:
 
-    snakeviz dns.prof
+    snakeviz dns_simulator.prof
 
 
 ### Memory & CPU profiling with Scalene (GUI)
@@ -131,34 +129,32 @@ Install Scalene:
 
 Run with GUI report:
 
-    scalene dns_simulator.py 256 10000 10 201 0.75 cpu
+    scalene -m cupyturbo.dns_simulator 256 10000 10 201 0.75 cpu
 
 
 ### Memory & CPU profiling with Scalene (CLI only)
 
 For a terminal-only summary:
 
-    scalene --cli --cpu dns_simulator.py -- 256 10000 10 201 0.75 cpu
-
-(Note: the `--` separates Scalene’s own options from the script arguments.)
+    scalene --cli --cpu -m cupyturbo.dns_simulator 256 10000 10 201 0.75 cpu
 
 
 ## Project layout (key modules)
 
-- `dns_main.py`  
+- `cupyturbo/dns_main.py`  
   CLI entry point; sets up the DNS state and runs the time loop.
 
-- `dns_simulator.py`  
+- `cupyturbo/dns_simulator.py`  
   Core DNS implementation:
   - PAO initialization (dns_pao_host_init)
   - FFT helpers (vfft_full_*)
   - STEP2A, STEP2B, STEP3
   - CFL-based time-step control (compute_cflm, next_dt)
 
-- `dns_wrapper.py`  
+- `cupyturbo/dns_wrapper.py`  
   Thin wrapper for programmatic use.
 
-- `gpu_test.py`  
+- `cupyturbo/gpu_test.py`  
   Simple CuPy test script to verify GPU availability and basic performance.
 
 

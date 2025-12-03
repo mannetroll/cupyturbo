@@ -3,7 +3,7 @@ name = "cupyturbo"
 version = "0.1.0"
 description = "2D DNS turbulence simulator (NumPy + CuPy)"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.13"
 license = { file = "LICENSE" }
 
 authors = [
@@ -11,8 +11,9 @@ authors = [
 ]
 
 dependencies = [
-    "numpy>=1.26",
-    "matplotlib>=3.8",
+    "numpy>=2.0.0",
+    "imageio",
+    "pyqt6",
 ]
 
 # Optional GPU extra
