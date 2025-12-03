@@ -40,7 +40,7 @@ From a cloned repo:
 
 The main entry point is `dns_main.py`.
 
-![DNS Viewer Window](https://github.com/mannetroll/cupyturbo/blob/main/window.png?raw=true)
+![DNS Viewer Window](https://raw.githubusercontent.com/mannetroll/cupyturbo/main/window.png)
 
 
 ### Quick start (CPU)
