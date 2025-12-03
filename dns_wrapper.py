@@ -1,4 +1,4 @@
-# numpy_dns_wrapper.py
+# dns_wrapper.py
 from __future__ import annotations
 
 from pathlib import Path
@@ -6,7 +6,7 @@ from typing import Union
 
 import numpy as np
 import math
-import numpy_dns_simulator as dns_all
+import dns_simulator as dns_all
 from PIL import Image
 
 
