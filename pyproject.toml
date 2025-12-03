@@ -1,5 +1,5 @@
 [project]
-name = "cupyturbo"
+name = "mannetroll-cupyturbo"
 version = "0.1.0"
 description = "2D DNS turbulence simulator (NumPy + CuPy)"
 readme = "README.md"
