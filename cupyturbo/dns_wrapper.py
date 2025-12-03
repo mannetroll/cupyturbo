@@ -6,7 +6,7 @@ from typing import Union
 
 import numpy as np
 import math
-import dns_simulator as dns_all
+from cupyturbo import dns_simulator as dns_all
 from PIL import Image
 
 
