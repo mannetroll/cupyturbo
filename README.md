@@ -1,6 +1,6 @@
 # cupyturbo — 2D Turbulence Simulation (NumPy / CuPy)
 
-`cupyturbo` is a small playground DNS code for **2D homogeneous, incompressible turbulence**, structurally ported from a legacy FORTRAN 77 implementation.
+`cupyturbo` is a small playground Direct Numerical Simulation (DNS) code for **2D Iomogeneous, Incompressible Turbulence**, structurally ported from a legacy FORTRAN 77 implementation.
 
 It supports:
 
