@@ -307,36 +307,7 @@ class MainWindow(QMainWindow):
         self.auto_reset_checkbox.setToolTip("If checked, simulation auto-resets")
         self.auto_reset_checkbox.setChecked(True)
 
-        # --- layout ---
-        # first row: control buttons
-        row1 = QHBoxLayout()
-        row1.setContentsMargins(15, 0, 0, 0)
-        row1.addWidget(self.start_button)
-        row1.addWidget(self.stop_button)
-        # row1.addWidget(self.step_button)
-        row1.addWidget(self.reset_button)
-        row1.addWidget(self.save_button)
-        row1.addWidget(self.cmap_combo)
-        row1.addWidget(self.auto_reset_checkbox)
-        row1.addWidget(self.steps_combo)
-        row1.addStretch()
-
-        # second row: variable + colormap + N
-        row2 = QHBoxLayout()
-        row2.setContentsMargins(10, 0, 0, 0)
-        row2.addWidget(self.variable_combo)
-        row2.addWidget(self.n_combo)
-        row2.addWidget(self.re_combo)
-        row2.addWidget(self.k0_combo)
-        row2.addWidget(self.cfl_combo)
-        row2.addStretch()
-
-        central = QWidget()
-        layout = QVBoxLayout(central)
-        layout.addWidget(self.image_label, stretch=0)
-        layout.addLayout(row1)
-        layout.addLayout(row2)
-        self.setCentralWidget(central)
+        self._build_layout()
 
         # --- status bar ---
         self.status = QStatusBar()
@@ -393,6 +364,58 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------------
 
+    def move_widgets(self, src_layout, dst_layout):
+        """Move only widgets from src_layout into dst_layout (ignore spacers)."""
+        while src_layout.count() > 0:
+            item = src_layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                dst_layout.addWidget(w)
+
+    def _build_layout(self):
+        """Rebuild the control layout based on current N."""
+        old = self.centralWidget()
+        if old is not None:
+            old.setParent(None)
+
+        central = QWidget()
+        main = QVBoxLayout(central)
+        main.addWidget(self.image_label)
+
+        # First row
+        row1 = QHBoxLayout()
+        row1.setContentsMargins(15, 0, 0, 0)
+        row1.addWidget(self.start_button)
+        row1.addWidget(self.stop_button)
+        row1.addWidget(self.reset_button)
+        row1.addWidget(self.save_button)
+        row1.addWidget(self.cmap_combo)
+        row1.addWidget(self.auto_reset_checkbox)
+        row1.addWidget(self.steps_combo)
+        row1.addStretch()
+
+        # Second row
+        row2 = QHBoxLayout()
+        row2.setContentsMargins(10, 0, 0, 0)
+        row2.addWidget(self.variable_combo)
+        row2.addWidget(self.n_combo)
+        row2.addWidget(self.re_combo)
+        row2.addWidget(self.k0_combo)
+        row2.addWidget(self.cfl_combo)
+        row2.addStretch()
+
+        # Combine into single row if large N
+        if self.sim.N >= 1024:
+            single = QHBoxLayout()
+            self.move_widgets(row1, single)
+            self.move_widgets(row2, single)
+            main.addLayout(single)
+        else:
+            main.addLayout(row1)
+            main.addLayout(row2)
+
+        self.setCentralWidget(central)
+
     def _maybe_downscale(self, rgb: np.ndarray) -> np.ndarray:
         """
         Downscale full-resolution RGB (H×W×3) by factor:
@@ -411,7 +434,7 @@ class MainWindow(QMainWindow):
         elif N <= 2048:
             scale = 4
         else:
-            scale = 8
+            scale = 4
 
         if scale == 1:
             return rgb
@@ -517,7 +540,7 @@ class MainWindow(QMainWindow):
         g.moveCenter(screen.center())
         self.setGeometry(g)
 
-        print("N =", N, "px,py =", self.sim.px, self.sim.py)
+        self._build_layout()
 
     def _recenter_window(self):
         screen = QApplication.primaryScreen().availableGeometry()
