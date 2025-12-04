@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QComboBox,
     QStatusBar,
+    QCheckBox,
 )
 
 from cupyturbo.dns_wrapper import NumPyDnsSimulator
@@ -228,18 +229,28 @@ class MainWindow(QMainWindow):
         self.start_button = QPushButton()
         self.start_button.setIcon(QIcon.fromTheme("media-playback-start"))
         self.start_button.setToolTip("Start simulation")
-        self.start_button.setFixedSize(36, 36)
-        self.start_button.setIconSize(QSize(24, 24))
+        self.start_button.setFixedSize(28, 28)
+        self.start_button.setIconSize(QSize(14, 14))
 
         self.stop_button = QPushButton()
         self.stop_button.setIcon(QIcon.fromTheme("media-playback-stop"))
         self.stop_button.setToolTip("Stop simulation")
-        self.stop_button.setFixedSize(36, 36)
-        self.stop_button.setIconSize(QSize(24, 24))
+        self.stop_button.setFixedSize(28, 28)
+        self.stop_button.setIconSize(QSize(14, 14))
 
         #self.step_button = QPushButton("Step")
-        self.reset_button = QPushButton("Reset")
-        self.save_button = QPushButton("Save")
+        self.reset_button = QPushButton()
+        self.reset_button.setIcon(QIcon.fromTheme("view-refresh"))
+        self.reset_button.setToolTip("Reset simulation")
+        self.reset_button.setFixedSize(28, 28)
+        self.reset_button.setIconSize(QSize(14, 14))
+
+        # Save button
+        self.save_button = QPushButton()
+        self.save_button.setIcon(QIcon.fromTheme("document-save"))
+        self.save_button.setToolTip("Save current frame")
+        self.save_button.setFixedSize(28, 28)
+        self.save_button.setIconSize(QSize(14, 14))
 
         self._status_update_counter = 0
 
@@ -279,6 +290,9 @@ class MainWindow(QMainWindow):
         self.steps_combo.addItems(["2000", "5000", "10000", "50000", "1E6"])
         self.steps_combo.setCurrentText("5000")
 
+        self.auto_reset_checkbox = QCheckBox()
+        self.auto_reset_checkbox.setChecked(True)
+
         # --- layout ---
         # first row: control buttons
         row1 = QHBoxLayout()
@@ -288,6 +302,7 @@ class MainWindow(QMainWindow):
         row1.addWidget(self.reset_button)
         row1.addWidget(self.save_button)
         row1.addWidget(self.cfl_combo)
+        row1.addWidget(self.auto_reset_checkbox)
         row1.addWidget(self.steps_combo)
         row1.addStretch()
 
@@ -523,9 +538,15 @@ class MainWindow(QMainWindow):
 
         # Optional auto-reset using STEPS combo
         if self.sim.get_iteration() >= self.sim.max_steps:
-            self.sim.reset_field()
-            self._sim_start_time = time.time()
-            self._sim_start_iter = self.sim.get_iteration()
+            if self.auto_reset_checkbox.isChecked():
+                # Auto-reset ON → behave as before
+                self.sim.reset_field()
+                self._sim_start_time = time.time()
+                self._sim_start_iter = self.sim.get_iteration()
+            else:
+                # Auto-reset OFF → stop simulation
+                self.timer.stop()
+                print("Max steps reached — simulation stopped (Auto-Reset OFF).")
 
     # ------------------------------------------------------------------
     def _update_image(self, pixels: np.ndarray) -> None:
