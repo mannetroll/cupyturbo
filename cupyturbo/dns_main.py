@@ -276,8 +276,8 @@ class MainWindow(QMainWindow):
 
         # Steps selector
         self.steps_combo = QComboBox()
-        self.steps_combo.addItems(["3000", "6000", "10000", "50000"])
-        self.steps_combo.setCurrentText("3000")
+        self.steps_combo.addItems(["2000", "5000", "10000", "50000"])
+        self.steps_combo.setCurrentText("5000")
 
         # --- layout ---
         # first row: control buttons
