@@ -274,6 +274,11 @@ class MainWindow(QMainWindow):
         self.cfl_combo.addItems(["0.25", "0.50", "0.75", "0.95"])
         self.cfl_combo.setCurrentText(str(self.sim.cfl))
 
+        # Steps selector
+        self.steps_combo = QComboBox()
+        self.steps_combo.addItems(["3000", "6000", "10000", "50000"])
+        self.steps_combo.setCurrentText("3000")
+
         # --- layout ---
         # first row: control buttons
         row1 = QHBoxLayout()
@@ -283,6 +288,7 @@ class MainWindow(QMainWindow):
         row1.addWidget(self.reset_button)
         row1.addWidget(self.save_button)
         row1.addWidget(self.cfl_combo)
+        row1.addWidget(self.steps_combo)
         row1.addStretch()
 
         # second row: variable + colormap + N
@@ -329,6 +335,7 @@ class MainWindow(QMainWindow):
         self.re_combo.currentTextChanged.connect(self.on_re_changed)
         self.k0_combo.currentTextChanged.connect(self.on_k0_changed)
         self.cfl_combo.currentTextChanged.connect(self.on_cfl_changed)
+        self.steps_combo.currentTextChanged.connect(self.on_steps_changed)
 
         # window setup
         self.setWindowTitle("2D Homogeneous Turbulence (NumPy)")
@@ -502,6 +509,9 @@ class MainWindow(QMainWindow):
         g.moveCenter(screen.center())
         self.setGeometry(g)
 
+    def on_steps_changed(self, value: str) -> None:
+        self.sim.max_steps = int(value)
+
     # ------------------------------------------------------------------
     def _on_timer(self) -> None:
         # one DNS step per timer tick
@@ -532,8 +542,8 @@ class MainWindow(QMainWindow):
 
             self._status_update_counter = 0
 
-        # Optional auto-reset like before
-        if self.sim.get_iteration() >= 3000:
+        # Optional auto-reset using STEPS combo
+        if self.sim.get_iteration() >= self.sim.max_steps:
             self.sim.reset_field()
             self._sim_start_time = time.time()
             self._sim_start_iter = self.sim.get_iteration()
@@ -631,15 +641,18 @@ class MainWindow(QMainWindow):
             self.cfl_combo.setCurrentIndex((idx + 1) % count)
             return
 
-        super().keyPressEvent(event)
+        # rotate steps (I)
+        if key == Qt.Key.Key_I:
+            idx = self.steps_combo.currentIndex()
+            count = self.steps_combo.count()
+            self.steps_combo.setCurrentIndex((idx + 1) % count)
+            return
 
-import os
-os.environ["QT_DEBUG_LAYOUT"] = "1"
+        super().keyPressEvent(event)
 
 # ----------------------------------------------------------------------
 def main() -> None:
     app = QApplication(sys.argv)
-    QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseStyleSheetPropagationInWidgetStyles)
     sim = NumPyDnsSimulator()
     window = MainWindow(sim)
     screen = app.primaryScreen().availableGeometry()
