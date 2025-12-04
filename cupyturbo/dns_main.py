@@ -227,7 +227,7 @@ class MainWindow(QMainWindow):
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         # --- small icon buttons ---
-        style = QApplication.instance().style()
+        style = QApplication.style()
 
         # Start button
         self.start_button = QPushButton()
@@ -262,25 +262,30 @@ class MainWindow(QMainWindow):
 
         # Variable selector
         self.variable_combo = QComboBox()
+        self.variable_combo.setToolTip("Field")
         self.variable_combo.addItems(["U", "V", "K", "Ω", "φ"])
 
         # Grid-size selector (N)
         self.n_combo = QComboBox()
+        self.n_combo.setToolTip("Grid Size (N)")
         self.n_combo.addItems(["128", "192", "256", "384", "512", "768", "1024"])
         self.n_combo.setCurrentText(str(self.sim.N))
 
         # Reynolds selector (Re)
         self.re_combo = QComboBox()
+        self.re_combo.setToolTip("Reynolds Number (Re)")
         self.re_combo.addItems(["1000", "10000", "100000", "1E6", "1E9", "1E12"])
         self.re_combo.setCurrentText(str(int(self.sim.re)))
 
         # K0 selector
         self.k0_combo = QComboBox()
+        self.k0_combo.setToolTip("Initial energy peak wavenumber K0")
         self.k0_combo.addItems(["1", "5", "10", "25", "50"])
         self.k0_combo.setCurrentText(str(int(self.sim.k0)))
 
         # Colormap selector
         self.cmap_combo = QComboBox()
+        self.cmap_combo.setToolTip("Colormap")
         self.cmap_combo.addItems(list(COLOR_MAPS.keys()))
         idx = self.cmap_combo.findText(DEFAULT_CMAP_NAME)
         if idx >= 0:
@@ -288,15 +293,18 @@ class MainWindow(QMainWindow):
 
         # CFL selector
         self.cfl_combo = QComboBox()
+        self.cfl_combo.setToolTip("CFL controlling Δt")
         self.cfl_combo.addItems(["0.15", "0.25", "0.50", "0.75", "0.95"])
         self.cfl_combo.setCurrentText(str(self.sim.cfl))
 
         # Steps selector
         self.steps_combo = QComboBox()
+        self.steps_combo.setToolTip("Max steps before reset/stop")
         self.steps_combo.addItems(["2000", "5000", "10000", "50000", "1E6"])
         self.steps_combo.setCurrentText("5000")
 
         self.auto_reset_checkbox = QCheckBox()
+        self.auto_reset_checkbox.setToolTip("If checked, simulation auto-resets")
         self.auto_reset_checkbox.setChecked(True)
 
         # --- layout ---
