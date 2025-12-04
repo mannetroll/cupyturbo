@@ -570,7 +570,14 @@ class MainWindow(QMainWindow):
 
     def _update_status(self, t: float, it: int, fps: Optional[float]) -> None:
         fps_str = f"{fps:4.0f}" if fps is not None else " N/a"
-        txt = f"FPS: {fps_str} | Iter: {it:5d} | T: {t:6.3f}"
+
+        # DPP = Display Pixel Percentage
+        dpp = 100 if self.sim.N < 768 else 50
+
+        txt = (
+            f"FPS: {fps_str} | Iter: {it:5d} | T: {t:6.3f} "
+            f"| DPP: {dpp}%"
+        )
         self.status.showMessage(txt)
 
     def _update_threads_label(self) -> None:
