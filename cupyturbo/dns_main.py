@@ -279,13 +279,13 @@ class MainWindow(QMainWindow):
 
         # K0 selector
         self.k0_combo = QComboBox()
-        self.k0_combo.setToolTip("Initial energy peak wavenumber K0")
+        self.k0_combo.setToolTip("Initial energy peak wavenumber (K0)")
         self.k0_combo.addItems(["1", "5", "10", "25", "50"])
         self.k0_combo.setCurrentText(str(int(self.sim.k0)))
 
         # Colormap selector
         self.cmap_combo = QComboBox()
-        self.cmap_combo.setToolTip("Colormap")
+        self.cmap_combo.setToolTip("Colormaps")
         self.cmap_combo.addItems(list(COLOR_MAPS.keys()))
         idx = self.cmap_combo.findText(DEFAULT_CMAP_NAME)
         if idx >= 0:
@@ -293,7 +293,7 @@ class MainWindow(QMainWindow):
 
         # CFL selector
         self.cfl_combo = QComboBox()
-        self.cfl_combo.setToolTip("CFL controlling Δt")
+        self.cfl_combo.setToolTip("Controlling Δt (CFL)")
         self.cfl_combo.addItems(["0.15", "0.25", "0.50", "0.75", "0.95"])
         self.cfl_combo.setCurrentText(str(self.sim.cfl))
 
