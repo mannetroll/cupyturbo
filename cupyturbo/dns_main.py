@@ -252,6 +252,16 @@ class MainWindow(QMainWindow):
         self.n_combo.addItems(["128", "192", "256", "384", "512", "768"])
         self.n_combo.setCurrentText(str(self.sim.N))
 
+        # Reynolds selector (Re)
+        self.re_combo = QComboBox()
+        self.re_combo.addItems(["1000", "10000", "100000", "1000000"])
+        self.re_combo.setCurrentText(str(int(self.sim.re)))
+
+        # K0 selector
+        self.k0_combo = QComboBox()
+        self.k0_combo.addItems(["5", "10", "25", "50"])
+        self.k0_combo.setCurrentText(str(int(self.sim.k0)))
+
         # Colormap selector
         self.cmap_combo = QComboBox()
         self.cmap_combo.addItems(list(COLOR_MAPS.keys()))
@@ -274,6 +284,8 @@ class MainWindow(QMainWindow):
         row2.addWidget(self.variable_combo)
         row2.addWidget(self.cmap_combo)
         row2.addWidget(self.n_combo)
+        row2.addWidget(self.re_combo)
+        row2.addWidget(self.k0_combo)
         row2.addStretch()
 
         central = QWidget()
@@ -308,6 +320,8 @@ class MainWindow(QMainWindow):
         self.variable_combo.currentIndexChanged.connect(self.on_variable_changed)
         self.cmap_combo.currentTextChanged.connect(self.on_cmap_changed)
         self.n_combo.currentTextChanged.connect(self.on_n_changed)
+        self.re_combo.currentTextChanged.connect(self.on_re_changed)
+        self.k0_combo.currentTextChanged.connect(self.on_k0_changed)
 
         # window setup
         self.setWindowTitle("2D Homogeneous Turbulence (NumPy)")
@@ -423,6 +437,40 @@ class MainWindow(QMainWindow):
         g.moveCenter(screen.center())
         self.move(g.topLeft())
 
+    def on_re_changed(self, value: str) -> None:
+        self.sim.re = float(value)
+        self.sim.set_N(self.sim.N)  # rebuild DNS with same N but new Re
+        self._update_image(self.sim.get_frame_pixels())
+
+        new_w = self.image_label.width() + 40
+        new_h = self.image_label.height() + 120
+
+        self.setMinimumSize(0, 0)
+        self.setMaximumSize(16777215, 16777215)
+        self.resize(new_w, new_h)
+
+        screen = QApplication.primaryScreen().availableGeometry()
+        g = self.geometry()
+        g.moveCenter(screen.center())
+        self.setGeometry(g)
+
+    def on_k0_changed(self, value: str) -> None:
+        self.sim.k0 = float(value)
+        self.sim.set_N(self.sim.N)  # rebuild DNS with same N but new K0
+        self._update_image(self.sim.get_frame_pixels())
+
+        new_w = self.image_label.width() + 40
+        new_h = self.image_label.height() + 120
+
+        self.setMinimumSize(0, 0)
+        self.setMaximumSize(16777215, 16777215)
+        self.resize(new_w, new_h)
+
+        screen = QApplication.primaryScreen().availableGeometry()
+        g = self.geometry()
+        g.moveCenter(screen.center())
+        self.setGeometry(g)
+
     # ------------------------------------------------------------------
     def _on_timer(self) -> None:
         # one DNS step per timer tick
@@ -529,6 +577,20 @@ class MainWindow(QMainWindow):
             idx = self.n_combo.currentIndex()
             count = self.n_combo.count()
             self.n_combo.setCurrentIndex((idx + 1) % count)
+            return
+
+        # rotate Reynolds (R)
+        if key == Qt.Key.Key_R:
+            idx = self.re_combo.currentIndex()
+            count = self.re_combo.count()
+            self.re_combo.setCurrentIndex((idx + 1) % count)
+            return
+
+        # rotate K0 (K)
+        if key == Qt.Key.Key_K:
+            idx = self.k0_combo.currentIndex()
+            count = self.k0_combo.count()
+            self.k0_combo.setCurrentIndex((idx + 1) % count)
             return
 
         super().keyPressEvent(event)
