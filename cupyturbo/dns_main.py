@@ -216,6 +216,12 @@ class MainWindow(QMainWindow):
 
         # --- central image label ---
         self.image_label = QLabel()
+        # allow shrinking when grid size becomes smaller
+        self.image_label.setSizePolicy(
+            self.image_label.sizePolicy().horizontalPolicy(),
+            self.image_label.sizePolicy().verticalPolicy()
+        )
+        self.image_label.setMinimumSize(1, 1)
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         # --- small icon buttons ---
@@ -241,6 +247,11 @@ class MainWindow(QMainWindow):
         self.variable_combo = QComboBox()
         self.variable_combo.addItems(["U", "V", "K", "Ω", "φ"])
 
+        # Grid-size selector (N)
+        self.n_combo = QComboBox()
+        self.n_combo.addItems(["256", "384", "512"])
+        self.n_combo.setCurrentText(str(self.sim.N))
+
         # Colormap selector
         self.cmap_combo = QComboBox()
         self.cmap_combo.addItems(list(COLOR_MAPS.keys()))
@@ -249,20 +260,27 @@ class MainWindow(QMainWindow):
             self.cmap_combo.setCurrentIndex(idx)
 
         # --- layout ---
-        button_row = QHBoxLayout()
-        button_row.addWidget(self.start_button)
-        button_row.addWidget(self.stop_button)
-        #button_row.addWidget(self.step_button)
-        button_row.addWidget(self.reset_button)
-        button_row.addWidget(self.save_button)
-        button_row.addStretch()
-        button_row.addWidget(self.variable_combo)
-        button_row.addWidget(self.cmap_combo)
+        # first row: control buttons
+        row1 = QHBoxLayout()
+        row1.addWidget(self.start_button)
+        row1.addWidget(self.stop_button)
+        # row1.addWidget(self.step_button)
+        row1.addWidget(self.reset_button)
+        row1.addWidget(self.save_button)
+        row1.addStretch()
+
+        # second row: variable + colormap + N
+        row2 = QHBoxLayout()
+        row2.addWidget(self.variable_combo)
+        row2.addWidget(self.cmap_combo)
+        row2.addWidget(self.n_combo)
+        row2.addStretch()
 
         central = QWidget()
         layout = QVBoxLayout(central)
-        layout.addWidget(self.image_label, stretch=1)
-        layout.addLayout(button_row)
+        layout.addWidget(self.image_label, stretch=0)
+        layout.addLayout(row1)
+        layout.addLayout(row2)
         self.setCentralWidget(central)
 
         # --- status bar ---
@@ -289,6 +307,7 @@ class MainWindow(QMainWindow):
         self.save_button.clicked.connect(self.on_save_clicked)
         self.variable_combo.currentIndexChanged.connect(self.on_variable_changed)
         self.cmap_combo.currentTextChanged.connect(self.on_cmap_changed)
+        self.n_combo.currentTextChanged.connect(self.on_n_changed)
 
         # window setup
         self.setWindowTitle("2D Homogeneous Turbulence (NumPy)")
@@ -371,6 +390,38 @@ class MainWindow(QMainWindow):
             self.current_cmap_name = name
             self._update_image(self.sim.get_frame_pixels())
 
+    def on_n_changed(self, value: str) -> None:
+        N = int(value)
+        self.sim.set_N(N)
+
+        # force image to update first (important!)
+        self._update_image(self.sim.get_frame_pixels())
+
+        # compute new window size based on fresh pixmap
+        new_w = self.image_label.width() + 40
+        new_h = self.image_label.height() + 120
+
+        print("Shrink to:", new_w, new_h)
+
+        # force-shrink the window
+        self.resize(new_w, new_h)
+        self.setFixedSize(self.size())
+        self.setMinimumSize(new_w, new_h)
+
+        # recenter
+        screen = QApplication.primaryScreen().availableGeometry()
+        g = self.geometry()
+        g.moveCenter(screen.center())
+        self.move(g.topLeft())
+
+        print("N =", N, "px,py =", self.sim.px, self.sim.py)
+
+    def _recenter_window(self):
+        screen = QApplication.primaryScreen().availableGeometry()
+        g = self.geometry()
+        g.moveCenter(screen.center())
+        self.move(g.topLeft())
+
     # ------------------------------------------------------------------
     def _on_timer(self) -> None:
         # one DNS step per timer tick
@@ -440,10 +491,13 @@ class MainWindow(QMainWindow):
                 QImage.Format.Format_RGB888,
             )
 
-        self.image_label.setPixmap(QPixmap.fromImage(qimg))
+        pix = QPixmap.fromImage(qimg)
+        self.image_label.setPixmap(pix)
+        self.image_label.setPixmap(pix)
+        self.image_label.adjustSize()
 
     def _update_status(self, t: float, it: int, fps: Optional[float]) -> None:
-        fps_str = f"{fps:4.0f}" if fps is not None else " n/a"
+        fps_str = f"{fps:4.0f}" if fps is not None else " N/a"
         txt = f"FPS: {fps_str} | Iter: {it:5d} | T: {t:6.3f}"
         self.status.showMessage(txt)
 
@@ -471,13 +525,15 @@ class MainWindow(QMainWindow):
 
         super().keyPressEvent(event)
 
+import os
+os.environ["QT_DEBUG_LAYOUT"] = "1"
+
 # ----------------------------------------------------------------------
 def main() -> None:
     app = QApplication(sys.argv)
+    QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseStyleSheetPropagationInWidgetStyles)
     sim = NumPyDnsSimulator()
     window = MainWindow(sim)
-    window.adjustSize()
-    window.setFixedSize(window.size())
     screen = app.primaryScreen().availableGeometry()
     g = window.geometry()
     g.moveCenter(screen.center())

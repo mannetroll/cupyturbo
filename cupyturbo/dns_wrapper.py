@@ -13,7 +13,7 @@ from PIL import Image
 class NumPyDnsSimulator:
     """
     DnsSimulator side is assumed to expose:
-      - dns_init(n, re, k0)
+      - dns_init(N, re, k0)
       - dns_step(t, dt, cn)
       - dns_kinetic(px, py)
       - dns_om2phys(px, py)
@@ -29,8 +29,8 @@ class NumPyDnsSimulator:
     VAR_STREAM = 4      # currently mapped to U (TODO)
 
     def __init__(self, n: int = 256, re: float = 10000.0, k0: float = 10.0):
-        self.n = int(n)
-        self.m = 3 * self.n
+        self.N = int(n)
+        self.m = 3 * self.N
         self.re = float(re)
         self.k0 = float(k0)
 
@@ -43,7 +43,7 @@ class NumPyDnsSimulator:
         #   NZ_full = 3*N/2, NX_full = 3*N/2
         # We map these directly to (py, px) for the GUI.
         self.state = dns_all.create_dns_state(
-            N=self.n,
+            N=self.N,
             Re=self.re,
             K0=self.k0,
             CFL=self.cfl,
@@ -108,6 +108,49 @@ class NumPyDnsSimulator:
         self.cn = float(S.cn)
         self.iteration += 1
 
+    def set_N(self, N: int) -> None:
+        """Recreate the entire DNS state with a new grid size N."""
+        self.N = int(N)
+        self.m = 3 * self.N  # preserve original structure
+
+        # Rebuild state exactly the same way __init__ does
+        self.state = dns_all.create_dns_state(
+            N=self.N,
+            Re=self.re,
+            K0=self.k0,
+            CFL=self.cfl,
+            backend="auto",
+        )
+
+        # DEBUG: print full-grid sizes
+        try:
+            print("DEBUG ur_full.shape =", self.state.ur_full.shape)
+        except Exception as e:
+            print("DEBUG ur_full.shape ERROR:", e)
+
+        print("DEBUG NZ_full =", self.state.NZ_full)
+        print("DEBUG NX_full =", self.state.NX_full)
+        print("DEBUG N input =", self.N)
+        print("-------------------------------------")
+
+        # update px/py for GUI (3/2 rule inside Fortran/Python DNS)
+        self.nx = int(self.state.NZ_full)
+        self.ny = int(self.state.NX_full)
+        self.py = self.nx
+        self.px = self.ny
+
+        # Reset integrator scalars like in reset_field()
+        dns_all.dns_step2a(self.state)
+        CFLM = dns_all.compute_cflm(self.state)
+        self.state.dt = self.state.cflnum / (CFLM * math.pi)
+        self.state.cn = 1.0
+        self.state.cnm1 = 0.0
+
+        self.t = float(self.state.t)
+        self.dt = float(self.state.dt)
+        self.cn = float(self.state.cn)
+        self.iteration = 0
+
     # ------------------------------------------------------------------
     def reset_field(self) -> None:
         """Reinitialize the DNS state on the Fortran side."""
@@ -118,7 +161,7 @@ class NumPyDnsSimulator:
 
         # Recreate the Python DNS state and redo the NEXTDT INIT phase
         self.state = dns_all.create_dns_state(
-            N=self.n,
+            N=self.N,
             Re=self.re,
             K0=self.k0,
             CFL=self.cfl,
