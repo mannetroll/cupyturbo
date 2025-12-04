@@ -408,6 +408,7 @@ class MainWindow(QMainWindow):
 
         self._update_image(self.sim.get_frame_pixels())
         self._update_status(self.sim.get_time(), self.sim.get_iteration(), None)
+        self.on_start_clicked()
 
     def on_save_clicked(self) -> None:
         path, _ = QFileDialog.getSaveFileName(
