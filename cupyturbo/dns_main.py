@@ -315,7 +315,6 @@ class MainWindow(QMainWindow):
         self.status.setFont(mono)
 
         self.threads_label = QLabel(self)
-        self._update_threads_label()
         self.status.addPermanentWidget(self.threads_label)
 
         # Timer-based simulation (no QThread)
@@ -380,7 +379,6 @@ class MainWindow(QMainWindow):
         return small.astype(np.uint8)
 
     def on_start_clicked(self) -> None:
-        self._update_threads_label()
         if not self.timer.isActive():
             self.timer.start()
 
@@ -577,15 +575,15 @@ class MainWindow(QMainWindow):
         # DPP = Display Pixel Percentage
         dpp = 100 if self.sim.N < 768 else 50
 
+        # Viscosity from DNS state
+        visc = float(self.sim.state.visc)
+
         txt = (
             f"FPS: {fps_str} | Iter: {it:5d} | T: {t:6.3f} "
-            f"| DPP: {dpp}%"
+            f"| DPP: {dpp}% | Visc: {visc:12.10f}"
         )
-        self.status.showMessage(txt)
 
-    def _update_threads_label(self) -> None:
-        text = f"Copyright © Mannetroll"
-        self.threads_label.setText(text)
+        self.status.showMessage(txt)
 
     # ------------------------------------------------------------------
     def keyPressEvent(self, event) -> None:
