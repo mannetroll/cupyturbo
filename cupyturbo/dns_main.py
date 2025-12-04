@@ -338,7 +338,9 @@ class MainWindow(QMainWindow):
         self.steps_combo.currentTextChanged.connect(self.on_steps_changed)
 
         # window setup
-        self.setWindowTitle("2D Homogeneous Turbulence (NumPy)")
+        # GPU/CPU title selection (no extra logic, just based on CuPy backend)
+        title_backend = "CuPy" if self.sim.state.backend == "gpu" else "NumPy"
+        self.setWindowTitle(f"2D Homogeneous Turbulence ({title_backend})")
         self.resize(self.sim.px + 40, self.sim.py + 120)
 
         self._last_pixels_rgb: Optional[np.ndarray] = None
