@@ -249,7 +249,7 @@ class MainWindow(QMainWindow):
 
         # Grid-size selector (N)
         self.n_combo = QComboBox()
-        self.n_combo.addItems(["256", "384", "512"])
+        self.n_combo.addItems(["128", "192", "256", "384", "512", "768"])
         self.n_combo.setCurrentText(str(self.sim.N))
 
         # Colormap selector
@@ -521,6 +521,13 @@ class MainWindow(QMainWindow):
             idx = self.cmap_combo.currentIndex()
             count = self.cmap_combo.count()
             self.cmap_combo.setCurrentIndex((idx + 1) % count)
+            return
+
+        # rotate n_combo (S)
+        if key == Qt.Key.Key_S:
+            idx = self.n_combo.currentIndex()
+            count = self.n_combo.count()
+            self.n_combo.setCurrentIndex((idx + 1) % count)
             return
 
         super().keyPressEvent(event)
