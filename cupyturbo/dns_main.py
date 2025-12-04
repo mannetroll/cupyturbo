@@ -268,7 +268,7 @@ class MainWindow(QMainWindow):
         # Grid-size selector (N)
         self.n_combo = QComboBox()
         self.n_combo.setToolTip("N: Grid Size (N)")
-        self.n_combo.addItems(["128", "192", "256", "384", "512", "768", "1024", "2048", "3072"])
+        self.n_combo.addItems(["128", "192", "256", "384", "512", "768", "1024", "2048", "3072", "4096"])
         self.n_combo.setCurrentText(str(self.sim.N))
 
         # Reynolds selector (Re)
@@ -421,8 +421,8 @@ class MainWindow(QMainWindow):
         Downscale full-resolution RGB (H×W×3) by factor:
             N < 768       → 1×  (100%)
             768–1024      → 2×  (50%)
-            1025–2048     → 4×  (25%)
-            ≥ 2049        → 8×  (12.5%)
+            1025–3072     → 4×  (25%)
+            ≥ 3072        → 6×  (17%)
         """
         N = self.sim.N
 
@@ -431,10 +431,10 @@ class MainWindow(QMainWindow):
             scale = 1
         elif N <= 1024:
             scale = 2
-        elif N <= 2048:
+        elif N <= 3072:
             scale = 4
         else:
-            scale = 4
+            scale = 6
 
         if scale == 1:
             return rgb
@@ -654,7 +654,7 @@ class MainWindow(QMainWindow):
         self.image_label.adjustSize()
 
     def _update_status(self, t: float, it: int, fps: Optional[float]) -> None:
-        fps_str = f"{fps:4.0f}" if fps is not None else " N/a"
+        fps_str = f"{fps:4.1f}" if fps is not None else " N/a"
 
         # DPP = Display Pixel Percentage
         N = self.sim.N
@@ -662,10 +662,10 @@ class MainWindow(QMainWindow):
             dpp = 100  # 1× scale
         elif N <= 1024:
             dpp = 50  # 2× downscale
-        elif N <= 2048:
+        elif N <= 3072:
             dpp = 25  # 4× downscale
         else:
-            dpp = 12  # 8× downscale (≈12.5%)
+            dpp = 17  # 6× downscale (≈16.7%)
 
         # Viscosity from DNS state
         visc = float(self.sim.state.visc)
