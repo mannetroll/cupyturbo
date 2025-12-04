@@ -296,6 +296,7 @@ class MainWindow(QMainWindow):
         # --- layout ---
         # first row: control buttons
         row1 = QHBoxLayout()
+        row1.setContentsMargins(25, 0, 0, 0)
         row1.addWidget(self.start_button)
         row1.addWidget(self.stop_button)
         # row1.addWidget(self.step_button)
@@ -308,6 +309,7 @@ class MainWindow(QMainWindow):
 
         # second row: variable + colormap + N
         row2 = QHBoxLayout()
+        row2.setContentsMargins(20, 0, 0, 0)
         row2.addWidget(self.variable_combo)
         row2.addWidget(self.cmap_combo)
         row2.addWidget(self.n_combo)
