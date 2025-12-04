@@ -605,8 +605,8 @@ class MainWindow(QMainWindow):
             self.cmap_combo.setCurrentIndex((idx + 1) % count)
             return
 
-        # rotate n_combo (S)
-        if key == Qt.Key.Key_S:
+        # rotate n_combo (N)
+        if key == Qt.Key.Key_N:
             idx = self.n_combo.currentIndex()
             count = self.n_combo.count()
             self.n_combo.setCurrentIndex((idx + 1) % count)
@@ -626,15 +626,15 @@ class MainWindow(QMainWindow):
             self.k0_combo.setCurrentIndex((idx + 1) % count)
             return
 
-        # rotate CFL (N)
-        if key == Qt.Key.Key_N:
+        # rotate CFL (L)
+        if key == Qt.Key.Key_L:
             idx = self.cfl_combo.currentIndex()
             count = self.cfl_combo.count()
             self.cfl_combo.setCurrentIndex((idx + 1) % count)
             return
 
-        # rotate steps (I)
-        if key == Qt.Key.Key_I:
+        # rotate steps (S)
+        if key == Qt.Key.Key_S:
             idx = self.steps_combo.currentIndex()
             count = self.steps_combo.count()
             self.steps_combo.setCurrentIndex((idx + 1) % count)

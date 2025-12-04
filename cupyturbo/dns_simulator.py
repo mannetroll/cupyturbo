@@ -495,7 +495,9 @@ def dns_pao_host_init(S: DnsState):
     Ceps2  = 0.5 * Q2 * De / (EP * EP)
 
     # Print diagnostics exactly like the CUDA/Fortran version
+    print(f" N           ={N:12.0f}")
     print(f" Reynolds n. ={float(S.Re):12.1f}")
+    print(f" K0          ={K0:12.0f}")
     print(f" Energy      ={Q2:12.4f}")
     print(f" WiWi        ={W2:12.4f}")
     print(f" Epsilon     ={EP:12.4f}")
