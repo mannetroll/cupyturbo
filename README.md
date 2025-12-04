@@ -162,7 +162,7 @@ For a terminal-only summary:
 ```
 curl -LsSf https://astral.sh/uv/install.sh | sh
 uv cache clean mannetroll-cupyturbo
-uv run --with mannetroll-cupyturbo==0.1.0 python -m cupyturbo.dns_main
+uv run --with mannetroll-cupyturbo==0.1.2 python -m cupyturbo.dns_main
 ```
 
 ## License
