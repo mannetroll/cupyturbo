@@ -394,25 +394,26 @@ class MainWindow(QMainWindow):
         N = int(value)
         self.sim.set_N(N)
 
-        # force image to update first (important!)
+        # 1) Update the image first
         self._update_image(self.sim.get_frame_pixels())
 
-        # compute new window size based on fresh pixmap
+        # 2) Compute new geometry
         new_w = self.image_label.width() + 40
         new_h = self.image_label.height() + 120
+        print("Resize to:", new_w, new_h)
 
-        print("Shrink to:", new_w, new_h)
+        # 3) Allow window to shrink (RESET constraints)
+        self.setMinimumSize(0, 0)
+        self.setMaximumSize(16777215, 16777215)
 
-        # force-shrink the window
+        # 4) Now resize → Qt WILL shrink
         self.resize(new_w, new_h)
-        self.setFixedSize(self.size())
-        self.setMinimumSize(new_w, new_h)
 
-        # recenter
+        # 5) Recenter
         screen = QApplication.primaryScreen().availableGeometry()
         g = self.geometry()
         g.moveCenter(screen.center())
-        self.move(g.topLeft())
+        self.setGeometry(g)
 
         print("N =", N, "px,py =", self.sim.px, self.sim.py)
 
