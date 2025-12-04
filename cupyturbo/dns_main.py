@@ -254,7 +254,7 @@ class MainWindow(QMainWindow):
 
         # Reynolds selector (Re)
         self.re_combo = QComboBox()
-        self.re_combo.addItems(["1000", "10000", "100000", "1000000"])
+        self.re_combo.addItems(["1000", "10000", "100000", "1000000", "1E9", "1E12"])
         self.re_combo.setCurrentText(str(int(self.sim.re)))
 
         # K0 selector
@@ -276,7 +276,7 @@ class MainWindow(QMainWindow):
 
         # Steps selector
         self.steps_combo = QComboBox()
-        self.steps_combo.addItems(["2000", "5000", "10000", "50000"])
+        self.steps_combo.addItems(["2000", "5000", "10000", "50000", "1E6"])
         self.steps_combo.setCurrentText("5000")
 
         # --- layout ---
@@ -489,7 +489,7 @@ class MainWindow(QMainWindow):
 
 
     def on_steps_changed(self, value: str) -> None:
-        self.sim.max_steps = int(value)
+        self.sim.max_steps = int(float(value))
 
     # ------------------------------------------------------------------
     def _on_timer(self) -> None:
