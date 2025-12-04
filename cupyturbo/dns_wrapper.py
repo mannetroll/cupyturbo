@@ -122,6 +122,7 @@ class NumPyDnsSimulator:
         )
 
         # DEBUG: print full-grid sizes
+        '''
         try:
             print("DEBUG ur_full.shape =", self.state.ur_full.shape)
         except Exception as e:
@@ -131,6 +132,7 @@ class NumPyDnsSimulator:
         print("DEBUG NX_full =", self.state.NX_full)
         print("DEBUG N input =", self.N)
         print("-------------------------------------")
+        '''
 
         # update px/py for GUI (3/2 rule inside Fortran/Python DNS)
         self.nx = int(self.state.NZ_full)

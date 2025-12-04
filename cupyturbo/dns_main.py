@@ -591,8 +591,8 @@ class MainWindow(QMainWindow):
     def keyPressEvent(self, event) -> None:
         key = event.key()
 
-        # rotate variable (P)
-        if key == Qt.Key.Key_P:
+        # rotate variable (V)
+        if key == Qt.Key.Key_V:
             idx = self.variable_combo.currentIndex()
             count = self.variable_combo.count()
             self.variable_combo.setCurrentIndex((idx + 1) % count)
