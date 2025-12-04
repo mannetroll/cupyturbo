@@ -268,7 +268,7 @@ class MainWindow(QMainWindow):
         # Grid-size selector (N)
         self.n_combo = QComboBox()
         self.n_combo.setToolTip("N: Grid Size (N)")
-        self.n_combo.addItems(["128", "192", "256", "384", "512", "768", "1024", "2048"])
+        self.n_combo.addItems(["128", "192", "256", "384", "512", "768", "1024", "2048", "3072"])
         self.n_combo.setCurrentText(str(self.sim.N))
 
         # Reynolds selector (Re)
