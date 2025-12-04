@@ -268,7 +268,7 @@ class MainWindow(QMainWindow):
         # Grid-size selector (N)
         self.n_combo = QComboBox()
         self.n_combo.setToolTip("N: Grid Size (N)")
-        self.n_combo.addItems(["128", "192", "256", "384", "512", "768", "1024"])
+        self.n_combo.addItems(["128", "192", "256", "384", "512", "768", "1024", "2048"])
         self.n_combo.setCurrentText(str(self.sim.N))
 
         # Reynolds selector (Re)
@@ -395,18 +395,37 @@ class MainWindow(QMainWindow):
 
     def _maybe_downscale(self, rgb: np.ndarray) -> np.ndarray:
         """
-        Downscale full-resolution RGB (H×W×3) by factor 2
-        when N = 768 or 1024.
+        Downscale full-resolution RGB (H×W×3) by factor:
+            N < 768       → 1×  (100%)
+            768–1024      → 2×  (50%)
+            1025–2048     → 4×  (25%)
+            ≥ 2049        → 8×  (12.5%)
         """
         N = self.sim.N
+
+        # Determine scale factor
         if N < 768:
+            scale = 1
+        elif N <= 1024:
+            scale = 2
+        elif N <= 2048:
+            scale = 4
+        else:
+            scale = 8
+
+        if scale == 1:
             return rgb
 
-        # half-size using simple 2×2 average
+        # --- Downscale by averaging blocks ---
         h, w, _ = rgb.shape
-        h2 = h // 2
-        w2 = w // 2
-        small = rgb[:2 * h2, :2 * w2].reshape(h2, 2, w2, 2, 3).mean(axis=(1, 3))
+        h2 = h // scale
+        w2 = w // scale
+
+        # Ensure reshape fits
+        rgb = rgb[:h2 * scale, :w2 * scale]
+
+        # Reshape to (h2, scale, w2, scale, 3) and average
+        small = rgb.reshape(h2, scale, w2, scale, 3).mean(axis=(1, 3))
         return small.astype(np.uint8)
 
     def on_start_clicked(self) -> None:
@@ -615,7 +634,15 @@ class MainWindow(QMainWindow):
         fps_str = f"{fps:4.0f}" if fps is not None else " N/a"
 
         # DPP = Display Pixel Percentage
-        dpp = 100 if self.sim.N < 768 else 50
+        N = self.sim.N
+        if N < 768:
+            dpp = 100  # 1× scale
+        elif N <= 1024:
+            dpp = 50  # 2× downscale
+        elif N <= 2048:
+            dpp = 25  # 4× downscale
+        else:
+            dpp = 12  # 8× downscale (≈12.5%)
 
         # Viscosity from DNS state
         visc = float(self.sim.state.visc)
