@@ -269,6 +269,11 @@ class MainWindow(QMainWindow):
         if idx >= 0:
             self.cmap_combo.setCurrentIndex(idx)
 
+        # CFL selector
+        self.cfl_combo = QComboBox()
+        self.cfl_combo.addItems(["0.25", "0.50", "0.75", "0.95"])
+        self.cfl_combo.setCurrentText(str(self.sim.cfl))
+
         # --- layout ---
         # first row: control buttons
         row1 = QHBoxLayout()
@@ -277,6 +282,7 @@ class MainWindow(QMainWindow):
         # row1.addWidget(self.step_button)
         row1.addWidget(self.reset_button)
         row1.addWidget(self.save_button)
+        row1.addWidget(self.cfl_combo)
         row1.addStretch()
 
         # second row: variable + colormap + N
@@ -322,6 +328,7 @@ class MainWindow(QMainWindow):
         self.n_combo.currentTextChanged.connect(self.on_n_changed)
         self.re_combo.currentTextChanged.connect(self.on_re_changed)
         self.k0_combo.currentTextChanged.connect(self.on_k0_changed)
+        self.cfl_combo.currentTextChanged.connect(self.on_cfl_changed)
 
         # window setup
         self.setWindowTitle("2D Homogeneous Turbulence (NumPy)")
@@ -471,6 +478,30 @@ class MainWindow(QMainWindow):
         g.moveCenter(screen.center())
         self.setGeometry(g)
 
+    def on_cfl_changed(self, value: str) -> None:
+        # update simulator CFL
+        self.sim.cfl = float(value)
+
+        # rebuild DNS state with same N, Re, K0 but new CFL
+        self.sim.set_N(self.sim.N)
+
+        # update image
+        self._update_image(self.sim.get_frame_pixels())
+
+        # geometry recompute
+        new_w = self.image_label.width() + 40
+        new_h = self.image_label.height() + 120
+
+        self.setMinimumSize(0, 0)
+        self.setMaximumSize(16777215, 16777215)
+        self.resize(new_w, new_h)
+
+        # recenter
+        screen = QApplication.primaryScreen().availableGeometry()
+        g = self.geometry()
+        g.moveCenter(screen.center())
+        self.setGeometry(g)
+
     # ------------------------------------------------------------------
     def _on_timer(self) -> None:
         # one DNS step per timer tick
@@ -591,6 +622,13 @@ class MainWindow(QMainWindow):
             idx = self.k0_combo.currentIndex()
             count = self.k0_combo.count()
             self.k0_combo.setCurrentIndex((idx + 1) % count)
+            return
+
+        # rotate CFL (N)
+        if key == Qt.Key.Key_N:
+            idx = self.cfl_combo.currentIndex()
+            count = self.cfl_combo.count()
+            self.cfl_combo.setCurrentIndex((idx + 1) % count)
             return
 
         super().keyPressEvent(event)

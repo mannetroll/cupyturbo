@@ -28,14 +28,12 @@ class NumPyDnsSimulator:
     VAR_OMEGA = 3       # currently mapped to U (TODO)
     VAR_STREAM = 4      # currently mapped to U (TODO)
 
-    def __init__(self, n: int = 256, re: float = 10000.0, k0: float = 10.0):
+    def __init__(self, n: int = 256, re: float = 10000.0, k0: float = 10.0,  cfl: float = 0.75):
         self.N = int(n)
         self.m = 3 * self.N
         self.re = float(re)
         self.k0 = float(k0)
-
-        # CFL number used by dns_all.py
-        self.cfl = 0.75
+        self.cfl =  float(cfl)
 
         # UR dimensions from Fortran workspace: UR(2+3N/2, 3N/2, 3)
         # For the pure-Python solver, we use the full 3/2-grid from DnsState.
