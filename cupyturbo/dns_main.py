@@ -265,12 +265,12 @@ class MainWindow(QMainWindow):
 
         # Reynolds selector (Re)
         self.re_combo = QComboBox()
-        self.re_combo.addItems(["1000", "10000", "100000", "1000000", "1E9", "1E12"])
+        self.re_combo.addItems(["1000", "10000", "100000", "1E6", "1E9", "1E12"])
         self.re_combo.setCurrentText(str(int(self.sim.re)))
 
         # K0 selector
         self.k0_combo = QComboBox()
-        self.k0_combo.addItems(["5", "10", "25", "50"])
+        self.k0_combo.addItems(["1", "5", "10", "25", "50"])
         self.k0_combo.setCurrentText(str(int(self.sim.k0)))
 
         # Colormap selector
@@ -426,10 +426,15 @@ class MainWindow(QMainWindow):
         self.on_start_clicked()
 
     def on_save_clicked(self) -> None:
+        # determine variable name for filename
+        var_name = self.variable_combo.currentText()
+
+        default_name = f"cupyturbo_{var_name}.png"
+
         path, _ = QFileDialog.getSaveFileName(
             self,
             "Save frame",
-            "frame.png",
+            default_name,
             "PNG images (*.png);;All files (*)",
         )
         if path:
