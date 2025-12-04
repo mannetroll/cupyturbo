@@ -339,7 +339,7 @@ class MainWindow(QMainWindow):
         # window setup
         # GPU/CPU title selection (no extra logic, just based on CuPy backend)
         title_backend = "CuPy" if self.sim.state.backend == "gpu" else "NumPy"
-        self.setWindowTitle(f"2D Homogeneous Turbulence ({title_backend})")
+        self.setWindowTitle(f"2D Turbulence ({title_backend}) © Mannetroll")
         self.resize(self.sim.px + 40, self.sim.py + 120)
 
         self._last_pixels_rgb: Optional[np.ndarray] = None
