@@ -249,7 +249,7 @@ class MainWindow(QMainWindow):
 
         # Grid-size selector (N)
         self.n_combo = QComboBox()
-        self.n_combo.addItems(["128", "192", "256", "384", "512", "768"])
+        self.n_combo.addItems(["128", "192", "256", "384", "512", "768", "1024"])
         self.n_combo.setCurrentText(str(self.sim.N))
 
         # Reynolds selector (Re)
@@ -360,6 +360,23 @@ class MainWindow(QMainWindow):
         self.timer.start()  # auto-start simulation immediately
 
     # ------------------------------------------------------------------
+
+    def _maybe_downscale(self, rgb: np.ndarray) -> np.ndarray:
+        """
+        Downscale full-resolution RGB (H×W×3) by factor 2
+        when N = 768 or 1024.
+        """
+        N = self.sim.N
+        if N < 768:
+            return rgb
+
+        # half-size using simple 2×2 average
+        h, w, _ = rgb.shape
+        h2 = h // 2
+        w2 = w // 2
+        small = rgb[:2 * h2, :2 * w2].reshape(h2, 2, w2, 2, 3).mean(axis=(1, 3))
+        return small.astype(np.uint8)
+
     def on_start_clicked(self) -> None:
         self._update_threads_label()
         if not self.timer.isActive():
@@ -426,8 +443,9 @@ class MainWindow(QMainWindow):
         self._update_image(self.sim.get_frame_pixels())
 
         # 2) Compute new geometry
-        new_w = self.image_label.width() + 40
-        new_h = self.image_label.height() + 120
+        # compute new window size based on downscaled image
+        new_w = self.image_label.pixmap().width() + 40
+        new_h = self.image_label.pixmap().height() + 120
         print("Resize to:", new_w, new_h)
 
         # 3) Allow window to shrink (RESET constraints)
@@ -456,58 +474,18 @@ class MainWindow(QMainWindow):
         self.sim.set_N(self.sim.N)  # rebuild DNS with same N but new Re
         self._update_image(self.sim.get_frame_pixels())
 
-        new_w = self.image_label.width() + 40
-        new_h = self.image_label.height() + 120
-
-        self.setMinimumSize(0, 0)
-        self.setMaximumSize(16777215, 16777215)
-        self.resize(new_w, new_h)
-
-        screen = QApplication.primaryScreen().availableGeometry()
-        g = self.geometry()
-        g.moveCenter(screen.center())
-        self.setGeometry(g)
-
     def on_k0_changed(self, value: str) -> None:
         self.sim.k0 = float(value)
         self.sim.set_N(self.sim.N)  # rebuild DNS with same N but new K0
         self._update_image(self.sim.get_frame_pixels())
 
-        new_w = self.image_label.width() + 40
-        new_h = self.image_label.height() + 120
-
-        self.setMinimumSize(0, 0)
-        self.setMaximumSize(16777215, 16777215)
-        self.resize(new_w, new_h)
-
-        screen = QApplication.primaryScreen().availableGeometry()
-        g = self.geometry()
-        g.moveCenter(screen.center())
-        self.setGeometry(g)
 
     def on_cfl_changed(self, value: str) -> None:
         # update simulator CFL
         self.sim.cfl = float(value)
-
-        # rebuild DNS state with same N, Re, K0 but new CFL
         self.sim.set_N(self.sim.N)
-
-        # update image
         self._update_image(self.sim.get_frame_pixels())
 
-        # geometry recompute
-        new_w = self.image_label.width() + 40
-        new_h = self.image_label.height() + 120
-
-        self.setMinimumSize(0, 0)
-        self.setMaximumSize(16777215, 16777215)
-        self.resize(new_w, new_h)
-
-        # recenter
-        screen = QApplication.primaryScreen().availableGeometry()
-        g = self.geometry()
-        g.moveCenter(screen.center())
-        self.setGeometry(g)
 
     def on_steps_changed(self, value: str) -> None:
         self.sim.max_steps = int(value)
@@ -571,6 +549,10 @@ class MainWindow(QMainWindow):
         else:
             lut_arr = np.asarray(lut, dtype=np.uint8)
             rgb = lut_arr[pixels]  # H×W×3
+
+            # Downscale if N = 768 or 1024
+            rgb = self._maybe_downscale(rgb)
+
             h, w, _ = rgb.shape
             self._last_pixels_rgb = rgb  # keep alive
             qimg = QImage(
