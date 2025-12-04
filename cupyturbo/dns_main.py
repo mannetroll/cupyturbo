@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QStatusBar,
     QCheckBox,
+    QStyle,
 )
 
 from cupyturbo.dns_wrapper import NumPyDnsSimulator
@@ -226,28 +227,44 @@ class MainWindow(QMainWindow):
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         # --- small icon buttons ---
+        style = QApplication.instance().style()
+
+        # Start button
         self.start_button = QPushButton()
-        self.start_button.setIcon(QIcon.fromTheme("media-playback-start"))
+        self.start_button.setIcon(
+            QIcon.fromTheme("media-playback-start",
+                            style.standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+        )
         self.start_button.setToolTip("Start simulation")
         self.start_button.setFixedSize(28, 28)
         self.start_button.setIconSize(QSize(14, 14))
 
+        # Stop button
         self.stop_button = QPushButton()
-        self.stop_button.setIcon(QIcon.fromTheme("media-playback-stop"))
+        self.stop_button.setIcon(
+            QIcon.fromTheme("media-playback-stop",
+                            style.standardIcon(QStyle.StandardPixmap.SP_MediaStop))
+        )
         self.stop_button.setToolTip("Stop simulation")
         self.stop_button.setFixedSize(28, 28)
         self.stop_button.setIconSize(QSize(14, 14))
 
-        #self.step_button = QPushButton("Step")
+        # Reset button
         self.reset_button = QPushButton()
-        self.reset_button.setIcon(QIcon.fromTheme("view-refresh"))
+        self.reset_button.setIcon(
+            QIcon.fromTheme("view-refresh",
+                            style.standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
+        )
         self.reset_button.setToolTip("Reset simulation")
         self.reset_button.setFixedSize(28, 28)
         self.reset_button.setIconSize(QSize(14, 14))
 
         # Save button
         self.save_button = QPushButton()
-        self.save_button.setIcon(QIcon.fromTheme("document-save"))
+        self.save_button.setIcon(
+            QIcon.fromTheme("document-save",
+                            style.standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton))
+        )
         self.save_button.setToolTip("Save current frame")
         self.save_button.setFixedSize(28, 28)
         self.save_button.setIconSize(QSize(14, 14))
