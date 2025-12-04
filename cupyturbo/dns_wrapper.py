@@ -34,7 +34,7 @@ class NumPyDnsSimulator:
         self.re = float(re)
         self.k0 = float(k0)
         self.cfl =  float(cfl)
-        self.max_steps = 3000
+        self.max_steps = 5000
 
         # UR dimensions from Fortran workspace: UR(2+3N/2, 3N/2, 3)
         # For the pure-Python solver, we use the full 3/2-grid from DnsState.
