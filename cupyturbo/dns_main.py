@@ -530,6 +530,12 @@ class MainWindow(QMainWindow):
         self._update_status(self.sim.get_time(), self.sim.get_iteration(), None)
         self.on_start_clicked()
 
+    @staticmethod
+    def sci_no_plus(x, decimals=0):
+        x = float(x)
+        s = f"{x:.{decimals}E}"
+        return s.replace("E+", "E").replace("e+", "e")
+
     def on_folder_clicked(self) -> None:
         from PyQt6.QtCore import QStandardPaths
 
@@ -540,7 +546,7 @@ class MainWindow(QMainWindow):
         CFL = self.sim.cfl
         STEPS = self.sim.max_steps
 
-        folder = f"cupyturbo_{N}_{Re}_{K0}_{CFL}_{STEPS}"
+        folder = f"cupyturbo_{N}_{self.sci_no_plus(Re)}_{K0}_{CFL}_{self.sci_no_plus(STEPS)}"
 
         # Default root = Desktop
         desktop = QStandardPaths.writableLocation(
