@@ -1,11 +1,11 @@
 # dns_main.py
 import time
 import sys
+import os
 from typing import Optional
 
-import numpy as np
 from PyQt6.QtCore import Qt, QSize, QTimer
-from PyQt6.QtGui import QImage, QPixmap, QFontDatabase, QIcon
+from PyQt6.QtGui import QImage, QPixmap, QFontDatabase
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
 )
 
 from cupyturbo.dns_wrapper import NumPyDnsSimulator
+from cupyturbo import dns_simulator as dns_all
 
 import numpy as np
 
@@ -337,7 +338,7 @@ class MainWindow(QMainWindow):
         #self.step_button.clicked.connect(self.on_step_clicked)
         self.reset_button.clicked.connect(self.on_reset_clicked)
         self.save_button.clicked.connect(self.on_save_clicked)
-        self.folder_button.clicked.connect(self.on_save_clicked)
+        self.folder_button.clicked.connect(self.on_folder_clicked)
         self.variable_combo.currentIndexChanged.connect(self.on_variable_changed)
         self.cmap_combo.currentTextChanged.connect(self.on_cmap_changed)
         self.n_combo.currentTextChanged.connect(self.on_n_changed)
@@ -458,6 +459,45 @@ class MainWindow(QMainWindow):
         small = rgb.reshape(h2, scale, w2, scale, 3).mean(axis=(1, 3))
         return small.astype(np.uint8)
 
+    def _get_full_field(self, variable: str) -> np.ndarray:
+        """
+        Return a 2D float32 array (NZ_full × NX_full) for variable:
+            'u', 'v', 'kinetic', 'omega'
+        """
+        S = self.sim.state
+
+        # --------------------------
+        # Direct velocity components
+        # --------------------------
+        if variable == "u":
+            field = S.ur_full[0]
+            return (field.get() if S.backend == "gpu" else field).astype(np.float32)
+
+        if variable == "v":
+            field = S.ur_full[1]
+            return (field.get() if S.backend == "gpu" else field).astype(np.float32)
+
+        # --------------------------
+        # Kinetic energy |u|
+        # --------------------------
+        if variable == "kinetic":
+            dns_all.dns_kinetic(S)  # fills ur_full[2,:,:]
+            field = S.ur_full[2]
+            return (field.get() if S.backend == "gpu" else field).astype(np.float32)
+
+        # --------------------------
+        # Physical vorticity ω
+        # --------------------------
+        if variable == "omega":
+            dns_all.dns_om2_phys(S)  # fills ur_full[2,:,:]
+            field = S.ur_full[2]
+            return (field.get() if S.backend == "gpu" else field).astype(np.float32)
+
+        # --------------------------
+        # Unknown variable
+        # --------------------------
+        raise ValueError(f"Unknown variable: {variable}")
+
     def on_start_clicked(self) -> None:
         if not self.timer.isActive():
             self.timer.start()
@@ -487,6 +527,39 @@ class MainWindow(QMainWindow):
         self._update_image(self.sim.get_frame_pixels())
         self._update_status(self.sim.get_time(), self.sim.get_iteration(), None)
         self.on_start_clicked()
+
+    def on_folder_clicked(self) -> None:
+        N = self.sim.N
+        Re = self.sim.re
+        K0 = self.sim.k0
+        CFL = self.sim.cfl
+        STEPS = self.sim.max_steps
+
+        folder = f"cupyturbo_{N}_{Re}_{K0}_{CFL}_{STEPS}"
+
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+
+        print(f"[SAVE] Dumping fields to folder: {folder}")
+
+        # --- dump U ---
+        arr_u = self._get_full_field("u")
+        self._dump_pgm_full(arr_u, os.path.join(folder, "u_velocity.pgm"))
+
+        # --- dump V ---
+        arr_v = self._get_full_field("v")
+        self._dump_pgm_full(arr_v, os.path.join(folder, "v_velocity.pgm"))
+
+        # --- dump Kinetic ---
+        arr_k = self._get_full_field("kinetic")
+        self._dump_pgm_full(arr_k, os.path.join(folder, "kinetic.pgm"))
+
+        # --- dump Omega ---
+        arr_o = self._get_full_field("omega")
+        self._dump_pgm_full(arr_o, os.path.join(folder, "omega.pgm"))
+
+        print("[SAVE] Completed.")
+
 
     def on_save_clicked(self) -> None:
         # determine variable name for filename
@@ -619,6 +692,32 @@ class MainWindow(QMainWindow):
                 print("Max steps reached — simulation stopped (Auto-Reset OFF).")
 
     # ------------------------------------------------------------------
+    import os
+
+    def _dump_pgm_full(self, arr: np.ndarray, filename: str):
+        """
+        Write a single component field as PGM (like dnsCudaDumpFieldAsPGMFull).
+
+        arr: 2D float32 array (NZ_full × NX_full)
+        """
+        h, w = arr.shape
+        minv = float(arr.min())
+        maxv = float(arr.max())
+
+        rng = maxv - minv
+
+        with open(filename, "wb") as f:
+            f.write(f"P5\n{w} {h}\n255\n".encode())
+
+            if rng <= 1e-12:  # constant field
+                f.write(bytes([128]) * (w * h))
+                return
+
+            # scale to 1..255
+            norm = (arr - minv) / rng
+            pix = (1.0 + norm * 254.0).round().clip(1, 255).astype(np.uint8)
+            f.write(pix.tobytes())
+
     def _update_image(self, pixels: np.ndarray) -> None:
         """
         Map H×W uint8 pixels through colormap and show in label.
