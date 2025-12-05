@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
     QStatusBar,
     QCheckBox,
     QStyle,
+    QLineEdit,
 )
 
 from cupyturbo.dns_wrapper import NumPyDnsSimulator
@@ -530,19 +531,9 @@ class MainWindow(QMainWindow):
         self.on_start_clicked()
 
     def on_folder_clicked(self) -> None:
+        from PyQt6.QtCore import QStandardPaths
 
-        # Default directory = Desktop (cross-platform)
-        desktop = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DesktopLocation)
-
-        # Ask user for a base directory starting at Desktop
-        base_dir = QFileDialog.getExistingDirectory(
-            self,
-            "Select destination directory",
-            desktop
-        )
-        if not base_dir:  # user cancelled
-            return
-
+        # --- Build the default folder name ---
         N = self.sim.N
         Re = self.sim.re
         K0 = self.sim.k0
@@ -550,26 +541,41 @@ class MainWindow(QMainWindow):
         STEPS = self.sim.max_steps
 
         folder = f"cupyturbo_{N}_{Re}_{K0}_{CFL}_{STEPS}"
-        folder_path = os.path.join(base_dir, folder)
 
+        # Default root = Desktop
+        desktop = QStandardPaths.writableLocation(
+            QStandardPaths.StandardLocation.DesktopLocation
+        )
+
+        # --- Create non-native dialog (macOS compatible) ---
+        dlg = QFileDialog(self)
+        dlg.setWindowTitle(f"Case: {folder}")
+        dlg.setFileMode(QFileDialog.FileMode.Directory)
+        dlg.setOption(QFileDialog.Option.ShowDirsOnly, True)
+        dlg.setOption(QFileDialog.Option.DontUseNativeDialog, True)
+        dlg.setDirectory(desktop)
+
+        # Prefill the directory edit field
+        for lineedit in dlg.findChildren(QLineEdit):
+            lineedit.setText(".")
+
+        # Execute dialog
+        if dlg.exec():
+            base_dir = dlg.selectedFiles()[0]
+        else:
+            return
+
+        # Build final path
+        folder_path = os.path.join(base_dir, folder)
         os.makedirs(folder_path, exist_ok=True)
+
         print(f"[SAVE] Dumping fields to folder: {folder_path}")
 
-        # --- dump U ---
-        arr_u = self._get_full_field("u")
-        self._dump_pgm_full(arr_u, os.path.join(folder_path, "u_velocity.pgm"))
-
-        # --- dump V ---
-        arr_v = self._get_full_field("v")
-        self._dump_pgm_full(arr_v, os.path.join(folder_path, "v_velocity.pgm"))
-
-        # --- dump Kinetic ---
-        arr_k = self._get_full_field("kinetic")
-        self._dump_pgm_full(arr_k, os.path.join(folder_path, "kinetic.pgm"))
-
-        # --- dump Omega ---
-        arr_o = self._get_full_field("omega")
-        self._dump_pgm_full(arr_o, os.path.join(folder_path, "omega.pgm"))
+        # Save all fields
+        self._dump_pgm_full(self._get_full_field("u"), os.path.join(folder_path, "u_velocity.pgm"))
+        self._dump_pgm_full(self._get_full_field("v"), os.path.join(folder_path, "v_velocity.pgm"))
+        self._dump_pgm_full(self._get_full_field("kinetic"), os.path.join(folder_path, "kinetic.pgm"))
+        self._dump_pgm_full(self._get_full_field("omega"), os.path.join(folder_path, "omega.pgm"))
 
         print("[SAVE] Completed.")
 
