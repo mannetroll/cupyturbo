@@ -257,6 +257,13 @@ class MainWindow(QMainWindow):
         self.save_button.setFixedSize(28, 28)
         self.save_button.setIconSize(QSize(14, 14))
 
+        # Folder button
+        self.folder_button = QPushButton()
+        self.folder_button.setIcon(style.standardIcon(QStyle.StandardPixmap.SP_DirIcon))
+        self.folder_button.setToolTip("Save files")
+        self.folder_button.setFixedSize(28, 28)
+        self.folder_button.setIconSize(QSize(14, 14))
+
 
         self._status_update_counter = 0
 
@@ -330,6 +337,7 @@ class MainWindow(QMainWindow):
         #self.step_button.clicked.connect(self.on_step_clicked)
         self.reset_button.clicked.connect(self.on_reset_clicked)
         self.save_button.clicked.connect(self.on_save_clicked)
+        self.folder_button.clicked.connect(self.on_save_clicked)
         self.variable_combo.currentIndexChanged.connect(self.on_variable_changed)
         self.cmap_combo.currentTextChanged.connect(self.on_cmap_changed)
         self.n_combo.currentTextChanged.connect(self.on_n_changed)
@@ -384,11 +392,11 @@ class MainWindow(QMainWindow):
 
         # First row
         row1 = QHBoxLayout()
-        row1.setContentsMargins(15, 0, 0, 0)
         row1.addWidget(self.start_button)
         row1.addWidget(self.stop_button)
         row1.addWidget(self.reset_button)
         row1.addWidget(self.save_button)
+        row1.addWidget(self.folder_button)
         row1.addWidget(self.cmap_combo)
         row1.addWidget(self.auto_reset_checkbox)
         row1.addWidget(self.steps_combo)
@@ -396,7 +404,6 @@ class MainWindow(QMainWindow):
 
         # Second row
         row2 = QHBoxLayout()
-        row2.setContentsMargins(10, 0, 0, 0)
         row2.addWidget(self.variable_combo)
         row2.addWidget(self.n_combo)
         row2.addWidget(self.re_combo)
