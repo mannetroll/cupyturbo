@@ -310,7 +310,7 @@ class MainWindow(QMainWindow):
         # Steps selector
         self.steps_combo = QComboBox()
         self.steps_combo.setToolTip("S: Max steps before reset/stop")
-        self.steps_combo.addItems(["2000", "5000", "10000", "50000", "1E5", "1E6"])
+        self.steps_combo.addItems(["2000", "5000", "10000", "25000", "50000", "1E5", "1E6"])
         self.steps_combo.setCurrentText("5000")
 
         self.auto_reset_checkbox = QCheckBox()
