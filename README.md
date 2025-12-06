@@ -13,7 +13,6 @@ The solver mirrors the original structure:
 - PAO-style random-field initialization
 - 3/2 de-aliasing in spectral space
 - Crank–Nicolson time integration
-- Time loop: STEP2B → STEP3 → STEP2A → NEXTDT
 
 
 ## Installation
