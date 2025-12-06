@@ -284,7 +284,7 @@ class MainWindow(QMainWindow):
         # Reynolds selector (Re)
         self.re_combo = QComboBox()
         self.re_combo.setToolTip("R: Reynolds Number (Re)")
-        self.re_combo.addItems(["1000", "10000", "100000", "1E6", "1E9", "1E12"])
+        self.re_combo.addItems(["1", "1000", "10000", "100000", "1E6", "1E9", "1E12"])
         self.re_combo.setCurrentText(str(int(self.sim.re)))
 
         # K0 selector
@@ -574,15 +574,11 @@ class MainWindow(QMainWindow):
         os.makedirs(folder_path, exist_ok=True)
 
         print(f"[SAVE] Dumping fields to folder: {folder_path}")
-
-        # Save all fields
         self._dump_pgm_full(self._get_full_field("u"), os.path.join(folder_path, "u_velocity.pgm"))
         self._dump_pgm_full(self._get_full_field("v"), os.path.join(folder_path, "v_velocity.pgm"))
         self._dump_pgm_full(self._get_full_field("kinetic"), os.path.join(folder_path, "kinetic.pgm"))
         self._dump_pgm_full(self._get_full_field("omega"), os.path.join(folder_path, "omega.pgm"))
-
         print("[SAVE] Completed.")
-
 
     def on_save_clicked(self) -> None:
         # determine variable name for filename
@@ -653,19 +649,24 @@ class MainWindow(QMainWindow):
 
     def on_re_changed(self, value: str) -> None:
         self.sim.re = float(value)
-        self.sim.set_N(self.sim.N)  # rebuild DNS with same N but new Re
+        self.sim.reset_field()
+        self._sim_start_time = time.time()
+        self._sim_start_iter = self.sim.get_iteration()
         self._update_image(self.sim.get_frame_pixels())
 
     def on_k0_changed(self, value: str) -> None:
         self.sim.k0 = float(value)
-        self.sim.set_N(self.sim.N)  # rebuild DNS with same N but new K0
+        self.sim.reset_field()
+        self._sim_start_time = time.time()
+        self._sim_start_iter = self.sim.get_iteration()
         self._update_image(self.sim.get_frame_pixels())
-
 
     def on_cfl_changed(self, value: str) -> None:
         # update simulator CFL
         self.sim.cfl = float(value)
-        self.sim.set_N(self.sim.N)
+        self.sim.reset_field()
+        self._sim_start_time = time.time()
+        self._sim_start_iter = self.sim.get_iteration()
         self._update_image(self.sim.get_frame_pixels())
 
 
