@@ -2,6 +2,8 @@
 import time
 import sys
 import os
+import colorsys
+import numpy as np
 from typing import Optional
 
 from PyQt6.QtCore import Qt, QSize, QTimer
@@ -26,7 +28,6 @@ from PyQt6.QtWidgets import (
 from cupyturbo.dns_wrapper import NumPyDnsSimulator
 from cupyturbo import dns_simulator as dns_all
 
-import numpy as np
 
 # Simple helper: build a 256x3 uint8 LUT from color stops in 0..1
 # stops: list of (pos, (r,g,b)) with pos in [0,1], r,g,b in [0,255]
@@ -67,7 +68,6 @@ def _make_gray_lut() -> np.ndarray:
 
 def _make_fire_lut() -> np.ndarray:
     """Approximate 'fire' palette via HSL ramp: red → yellow, brightening."""
-    import colorsys
     lut = np.zeros((256, 3), dtype=np.uint8)
     for x in range(256):
         # Hue 0..85 degrees
@@ -533,8 +533,6 @@ class MainWindow(QMainWindow):
         return s.replace("E+", "E").replace("e+", "e")
 
     def on_folder_clicked(self) -> None:
-        from PyQt6.QtCore import QStandardPaths
-
         # --- Build the default folder name ---
         N = self.sim.N
         Re = self.sim.re
@@ -715,8 +713,6 @@ class MainWindow(QMainWindow):
                 print("Max steps reached — simulation stopped (Auto-Reset OFF).")
 
     # ------------------------------------------------------------------
-    import os
-
     def _dump_pgm_full(self, arr: np.ndarray, filename: str):
         """
         Write a single component field as PGM (like dnsCudaDumpFieldAsPGMFull).
