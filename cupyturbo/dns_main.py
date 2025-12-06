@@ -501,6 +501,8 @@ class MainWindow(QMainWindow):
         raise ValueError(f"Unknown variable: {variable}")
 
     def on_start_clicked(self) -> None:
+        self._sim_start_time = time.time()
+        self._sim_start_iter = self.sim.get_iteration()
         if not self.timer.isActive():
             self.timer.start()
 
