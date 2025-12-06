@@ -331,22 +331,22 @@ class MainWindow(QMainWindow):
         # Timer-based simulation (no QThread)
         self.timer = QTimer(self)
         self.timer.setInterval(0)   # as fast as Qt allows
-        self.timer.timeout.connect(self._on_timer)
+        self.timer.timeout.connect(self._on_timer) # type: ignore[attr-defined]
 
         # signal connections
-        self.start_button.clicked.connect(self.on_start_clicked)
-        self.stop_button.clicked.connect(self.on_stop_clicked)
+        self.start_button.clicked.connect(self.on_start_clicked) # type: ignore[attr-defined]
+        self.stop_button.clicked.connect(self.on_stop_clicked) # type: ignore[attr-defined]
         #self.step_button.clicked.connect(self.on_step_clicked)
-        self.reset_button.clicked.connect(self.on_reset_clicked)
-        self.save_button.clicked.connect(self.on_save_clicked)
-        self.folder_button.clicked.connect(self.on_folder_clicked)
-        self.variable_combo.currentIndexChanged.connect(self.on_variable_changed)
-        self.cmap_combo.currentTextChanged.connect(self.on_cmap_changed)
-        self.n_combo.currentTextChanged.connect(self.on_n_changed)
-        self.re_combo.currentTextChanged.connect(self.on_re_changed)
-        self.k0_combo.currentTextChanged.connect(self.on_k0_changed)
-        self.cfl_combo.currentTextChanged.connect(self.on_cfl_changed)
-        self.steps_combo.currentTextChanged.connect(self.on_steps_changed)
+        self.reset_button.clicked.connect(self.on_reset_clicked) # type: ignore[attr-defined]
+        self.save_button.clicked.connect(self.on_save_clicked) # type: ignore[attr-defined]
+        self.folder_button.clicked.connect(self.on_folder_clicked) # type: ignore[attr-defined]
+        self.variable_combo.currentIndexChanged.connect(self.on_variable_changed) # type: ignore[attr-defined]
+        self.cmap_combo.currentTextChanged.connect(self.on_cmap_changed) # type: ignore[attr-defined]
+        self.n_combo.currentTextChanged.connect(self.on_n_changed) # type: ignore[attr-defined]
+        self.re_combo.currentTextChanged.connect(self.on_re_changed) # type: ignore[attr-defined]
+        self.k0_combo.currentTextChanged.connect(self.on_k0_changed) # type: ignore[attr-defined]
+        self.cfl_combo.currentTextChanged.connect(self.on_cfl_changed) # type: ignore[attr-defined]
+        self.steps_combo.currentTextChanged.connect(self.on_steps_changed) # type: ignore[attr-defined]
 
         # window setup
         # GPU/CPU title selection (no extra logic, just based on CuPy backend)
@@ -373,7 +373,8 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------------
 
-    def move_widgets(self, src_layout, dst_layout):
+    @staticmethod
+    def move_widgets(src_layout, dst_layout):
         """Move only widgets from src_layout into dst_layout (ignore spacers)."""
         while src_layout.count() > 0:
             item = src_layout.takeAt(0)
@@ -382,7 +383,7 @@ class MainWindow(QMainWindow):
                 dst_layout.addWidget(w)
 
     def _build_layout(self):
-        """Rebuild the control layout based on current N."""
+        """Rebuild the control layout based on the current N."""
         old = self.centralWidget()
         if old is not None:
             old.setParent(None)
@@ -412,7 +413,7 @@ class MainWindow(QMainWindow):
         row2.addWidget(self.cfl_combo)
         row2.addStretch()
 
-        # Combine into single row if large N
+        # Combine into the single row if large N
         if self.sim.N >= 1024:
             single = QHBoxLayout()
             self.move_widgets(row1, single)
@@ -427,10 +428,6 @@ class MainWindow(QMainWindow):
     def _maybe_downscale(self, rgb: np.ndarray) -> np.ndarray:
         """
         Downscale full-resolution RGB (H×W×3) by factor:
-            N < 768       → 1×  (100%)
-            768–1024      → 2×  (50%)
-            1025–3072     → 4×  (25%)
-            ≥ 3072        → 6×  (17%)
         """
         N = self.sim.N
 
@@ -557,7 +554,7 @@ class MainWindow(QMainWindow):
 
         # Prefill the directory edit field
         for lineedit in dlg.findChildren(QLineEdit):
-            lineedit.setText(".")
+            lineedit.setText(".") # type: ignore[attr-defined]
 
         # Execute dialog
         if dlg.exec():
@@ -617,12 +614,12 @@ class MainWindow(QMainWindow):
         self._update_image(self.sim.get_frame_pixels())
 
         # 2) Compute new geometry
-        # compute new window size based on downscaled image
+        # compute new window size based on the downscaled image
         new_w = self.image_label.pixmap().width() + 40
         new_h = self.image_label.pixmap().height() + 120
         print("Resize to:", new_w, new_h)
 
-        # 3) Allow window to shrink (RESET constraints)
+        # 3) Allow the window to shrink (RESET constraints)
         self.setMinimumSize(0, 0)
         self.setMaximumSize(16777215, 16777215)
 
@@ -675,7 +672,7 @@ class MainWindow(QMainWindow):
         # one DNS step per timer tick
         self.sim.step()
 
-        # Count frames since last GUI update
+        # Count frames since the last GUI update
         self._status_update_counter += 1
 
         # Update GUI only every 10 frames
@@ -713,11 +710,10 @@ class MainWindow(QMainWindow):
                 print("Max steps reached — simulation stopped (Auto-Reset OFF).")
 
     # ------------------------------------------------------------------
-    def _dump_pgm_full(self, arr: np.ndarray, filename: str):
+    @staticmethod
+    def _dump_pgm_full(arr: np.ndarray, filename: str):
         """
-        Write a single component field as PGM (like dnsCudaDumpFieldAsPGMFull).
-
-        arr: 2D float32 array (NZ_full × NX_full)
+        Write a single component field as PGM
         """
         h, w = arr.shape
         minv = float(arr.min())
@@ -739,7 +735,7 @@ class MainWindow(QMainWindow):
 
     def _update_image(self, pixels: np.ndarray) -> None:
         """
-        Map H×W uint8 pixels through colormap and show in label.
+        Map H×W uint8 pixels through colormap and show in the label.
         """
         pixels = np.asarray(pixels, dtype=np.uint8)
         if pixels.ndim != 2:
