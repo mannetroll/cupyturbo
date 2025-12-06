@@ -638,8 +638,9 @@ class MainWindow(QMainWindow):
         g = self.geometry()
         g.moveCenter(screen.center())
         self.setGeometry(g)
-
         self._build_layout()
+        self._sim_start_time = time.time()
+        self._sim_start_iter = self.sim.get_iteration()
 
     def _recenter_window(self):
         screen = QApplication.primaryScreen().availableGeometry()
