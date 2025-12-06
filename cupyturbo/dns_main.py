@@ -501,6 +501,7 @@ class MainWindow(QMainWindow):
         raise ValueError(f"Unknown variable: {variable}")
 
     def on_start_clicked(self) -> None:
+        # reset FPS baseline to "new simulation start"
         self._sim_start_time = time.time()
         self._sim_start_iter = self.sim.get_iteration()
         if not self.timer.isActive():
@@ -523,11 +524,6 @@ class MainWindow(QMainWindow):
     def on_reset_clicked(self) -> None:
         self.on_stop_clicked()
         self.sim.reset_field()
-
-        # reset FPS baseline to "new simulation start"
-        self._sim_start_time = time.time()
-        self._sim_start_iter = self.sim.get_iteration()
-
         self._update_image(self.sim.get_frame_pixels())
         self._update_status(self.sim.get_time(), self.sim.get_iteration(), None)
         self.on_start_clicked()
