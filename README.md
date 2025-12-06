@@ -146,9 +146,6 @@ For a terminal-only summary:
 - `cupyturbo/dns_wrapper.py`  
   Thin wrapper for programmatic use.
 
-- `cupyturbo/gpu_test.py`  
-  Simple CuPy test script to verify GPU availability and basic performance.
-
 ## one-liner
 
 ```
