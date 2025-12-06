@@ -400,9 +400,8 @@ class MainWindow(QMainWindow):
         row1.addWidget(self.save_button)
         row1.addWidget(self.folder_button)
         row1.addWidget(self.cmap_combo)
-        row1.addWidget(self.auto_reset_checkbox)
         row1.addWidget(self.steps_combo)
-        row1.addStretch()
+        row1.addWidget(self.auto_reset_checkbox)
 
         # Second row
         row2 = QHBoxLayout()
@@ -411,7 +410,6 @@ class MainWindow(QMainWindow):
         row2.addWidget(self.re_combo)
         row2.addWidget(self.k0_combo)
         row2.addWidget(self.cfl_combo)
-        row2.addStretch()
 
         # Combine into the single row if large N
         if self.sim.N >= 1024:
