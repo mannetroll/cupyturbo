@@ -22,6 +22,7 @@ The solver mirrors the original structure:
 From the project root:
 
     uv sync
+    uv run python -m cupyturbo.dns_main
 
 This creates a virtual environment and installs the project and its dependencies from `pyproject.toml`.
 
@@ -38,12 +39,6 @@ From a cloned repo:
 
 ![DNS Viewer Window](https://raw.githubusercontent.com/mannetroll/cupyturbo/main/window.png)
 
-### Quick start (CPU)
-
-    uv sync
-    uv run python -m cupyturbo.dns_main
-
-This runs with default parameters (e.g. N=256, Re=10000, a default number of steps, CPU backend).
 
 ### Full CLI
 
