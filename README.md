@@ -33,9 +33,7 @@ From a cloned repo:
     python -m venv .venv
     source .venv/bin/activate      # on Windows: .venv\Scripts\activate
     pip install -e .
-
-(Once published on PyPI, you’ll be able to do `pip install cupyturbo` directly.)
-
+    python -m cupyturbo.dns_main
 
 ## Running the DNS
 
