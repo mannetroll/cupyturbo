@@ -25,8 +25,8 @@ class NumPyDnsSimulator:
     VAR_U = 0
     VAR_V = 1
     VAR_ENERGY = 2
-    VAR_OMEGA = 3       # currently mapped to U (TODO)
-    VAR_STREAM = 4      # currently mapped to U (TODO)
+    VAR_OMEGA = 3
+    VAR_STREAM = 4
 
     def __init__(self, n: int = 256, re: float = 10000.0, k0: float = 10.0,  cfl: float = 0.75):
         self.N = int(n)
@@ -243,8 +243,8 @@ class NumPyDnsSimulator:
           VAR_U      -> UR(:,:,1)
           VAR_V      -> UR(:,:,2)
           VAR_ENERGY -> sqrt(u^2+v^2+w^2)
-          VAR_OMEGA  -> (currently same as U, TODO proper vorticity)
-          VAR_STREAM -> (currently same as U, TODO streamfunction)
+          VAR_OMEGA  -> vorticity
+          VAR_STREAM -> streamfunction
         """
         if var is None:
             var = self.current_var
