@@ -35,9 +35,9 @@ From a cloned repo:
     pip install -e .
     python -m cupyturbo.dns_main
 
-## Running the DNS
+## The DNS with NumPy (256 x 256)
 
-![DNS Viewer Window](https://raw.githubusercontent.com/mannetroll/cupyturbo/main/window.png)
+![DNS NumPy](https://raw.githubusercontent.com/mannetroll/cupyturbo/main/window.png)
 
 
 ### Full CLI
@@ -86,6 +86,11 @@ On a CUDA machine (e.g. RTX 3090):
 Or let the backend auto-detect:
 
        uv run python -m cupyturbo.dns_simulator 256 10000 10 1001 0.75 auto
+
+
+## The DNS with CuPy (4096 x 4096)
+
+![DNS CuPy](https://raw.githubusercontent.com/mannetroll/cupyturbo/main/window4096.png)
 
 
 ## Profiling
@@ -151,7 +156,7 @@ For a terminal-only summary:
 ```
 curl -LsSf https://astral.sh/uv/install.sh | sh
 uv cache clean mannetroll-cupyturbo
-uv run --with mannetroll-cupyturbo==0.1.2 python -m cupyturbo.dns_main
+uv run --with mannetroll-cupyturbo==0.1.3 python -m cupyturbo.dns_main
 ```
 
 ## License
