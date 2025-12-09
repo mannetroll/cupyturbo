@@ -595,8 +595,8 @@ class MainWindow(QMainWindow):
     def on_save_clicked(self) -> None:
         # determine variable name for filename
         var_name = self.variable_combo.currentText()
-
-        default_name = f"cupyturbo_{var_name}.png"
+        cmap_name = self.cmap_combo.currentText()
+        default_name = f"cupyturbo_{var_name}_{cmap_name}.png"
 
         # Default root = Desktop
         desktop = QStandardPaths.writableLocation(
