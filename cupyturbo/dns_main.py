@@ -165,6 +165,44 @@ def _make_ocean_lut() -> np.ndarray:
     ]
     return _make_lut_from_stops(stops)
 
+def _make_cividis_lut() -> np.ndarray:
+    stops = [
+        (0.00, (  0,  34,  77)),
+        (0.25, (  0,  68, 117)),
+        (0.50, (  60, 111, 130)),
+        (0.75, (147, 147,  95)),
+        (1.00, (250, 231,  33)),
+    ]
+    return _make_lut_from_stops(stops)
+
+def _make_jet_lut() -> np.ndarray:
+    stops = [
+        (0.00, (  0,   0, 131)),  # dark blue
+        (0.35, (  0, 255, 255)),  # cyan
+        (0.66, (255, 255,   0)),  # yellow
+        (1.00, (128,   0,   0)),  # dark red
+    ]
+    return _make_lut_from_stops(stops)
+
+def _make_coolwarm_lut() -> np.ndarray:
+    stops = [
+        (0.00, ( 59,  76, 192)),  # deep blue
+        (0.25, (127, 150, 203)),
+        (0.50, (217, 217, 217)),  # near white (center)
+        (0.75, (203, 132, 123)),
+        (1.00, (180,   4,  38)),  # deep red
+    ]
+    return _make_lut_from_stops(stops)
+def _make_rdbu_lut() -> np.ndarray:
+    stops = [
+        (0.00, (103,   0,  31)),  # dark red
+        (0.25, (178,  24,  43)),
+        (0.50, (247, 247, 247)),  # white center
+        (0.75, ( 33, 102, 172)),
+        (1.00, (  5,  48,  97)),  # dark blue
+    ]
+    return _make_lut_from_stops(stops)
+
 def _make_plasma_lut() -> np.ndarray:
     stops = [
         (0.0,  ( 13,   8, 135)),
@@ -199,15 +237,19 @@ def _make_turbo_lut() -> np.ndarray:
     return _make_lut_from_stops(stops)
 
 
-GRAY_LUT      = _make_gray_lut()
-INFERNO_LUT   = _make_inferno_lut()
-OCEAN_LUT     = _make_ocean_lut()
-VIRIDIS_LUT   = _make_viridis_lut()
-PLASMA_LUT    = _make_plasma_lut()
-MAGMA_LUT     = _make_magma_lut()
-TURBO_LUT     = _make_turbo_lut()
-FIRE_LUT      = _make_fire_lut()
-DOOM_FIRE_LUT = _make_doom_fire_lut()
+GRAY_LUT       = _make_gray_lut()
+INFERNO_LUT    = _make_inferno_lut()
+OCEAN_LUT      = _make_ocean_lut()
+VIRIDIS_LUT    = _make_viridis_lut()
+PLASMA_LUT     = _make_plasma_lut()
+MAGMA_LUT      = _make_magma_lut()
+TURBO_LUT      = _make_turbo_lut()
+FIRE_LUT       = _make_fire_lut()
+DOOM_FIRE_LUT  = _make_doom_fire_lut()
+CIVIDIS_LUT    = _make_cividis_lut()
+JET_LUT        = _make_jet_lut()
+COOLWARM_LUT   = _make_coolwarm_lut()
+RDBU_LUT       = _make_rdbu_lut()
 
 COLOR_MAPS = {
     "Gray": GRAY_LUT,
@@ -219,6 +261,10 @@ COLOR_MAPS = {
     "Turbo": TURBO_LUT,
     "Fire": FIRE_LUT,
     "Doom": DOOM_FIRE_LUT,
+    "Cividis": CIVIDIS_LUT,
+    "Jet": JET_LUT,
+    "Coolwarm": COOLWARM_LUT,
+    "RdBu": RDBU_LUT,
 }
 
 DEFAULT_CMAP_NAME = "Turbo"
