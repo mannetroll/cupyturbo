@@ -432,7 +432,7 @@ class MainWindow(QMainWindow):
         self.variable_combo.setCurrentIndex(3)
 
         # (optional) a nice colormap index
-        self.cmap_combo.setCurrentIndex(5)
+        self.cmap_combo.setCurrentIndex(6)
 
         self._update_image(self.sim.get_frame_pixels())
         self._update_status(self.sim.get_time(), self.sim.get_iteration(), None)
