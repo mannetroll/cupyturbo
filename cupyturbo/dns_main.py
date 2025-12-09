@@ -370,7 +370,7 @@ class MainWindow(QMainWindow):
         self._update_image(self.sim.get_frame_pixels())
         self._update_status(self.sim.get_time(), self.sim.get_iteration(), None)
 
-        self.timer.start()  # auto-start simulation immediately
+        self.on_start_clicked()  # auto-start simulation immediately
 
     # ------------------------------------------------------------------
 
@@ -494,6 +494,12 @@ class MainWindow(QMainWindow):
         # --------------------------
         raise ValueError(f"Unknown variable: {variable}")
 
+    def _update_run_buttons(self) -> None:
+        """Enable/disable Start/Stop depending on timer state."""
+        running = self.timer.isActive()
+        self.start_button.setEnabled(not running)
+        self.stop_button.setEnabled(running)
+
     def on_start_clicked(self) -> None:
         # reset FPS baseline to "new simulation start"
         self._sim_start_time = time.time()
@@ -501,9 +507,13 @@ class MainWindow(QMainWindow):
         if not self.timer.isActive():
             self.timer.start()
 
+        self._update_run_buttons()
+
     def on_stop_clicked(self) -> None:
         if self.timer.isActive():
             self.timer.stop()
+
+        self._update_run_buttons()
 
     def on_step_clicked(self) -> None:
         self.sim.step()
