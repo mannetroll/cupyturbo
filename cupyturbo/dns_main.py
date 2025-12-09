@@ -236,7 +236,6 @@ def _make_turbo_lut() -> np.ndarray:
     ]
     return _make_lut_from_stops(stops)
 
-
 GRAY_LUT       = _make_gray_lut()
 INFERNO_LUT    = _make_inferno_lut()
 OCEAN_LUT      = _make_ocean_lut()
