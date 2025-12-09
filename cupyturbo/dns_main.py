@@ -578,12 +578,21 @@ class MainWindow(QMainWindow):
 
         default_name = f"cupyturbo_{var_name}.png"
 
+        # Default root = Desktop
+        desktop = QStandardPaths.writableLocation(
+            QStandardPaths.StandardLocation.DesktopLocation
+        )
+
+        default_name = "frame.png"
+        initial_path = desktop + "/" + default_name
+
         path, _ = QFileDialog.getSaveFileName(
             self,
             "Save frame",
-            default_name,
+            initial_path,
             "PNG images (*.png);;All files (*)",
         )
+
         if path:
             pm = self.image_label.pixmap()
             if pm:
