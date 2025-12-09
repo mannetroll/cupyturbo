@@ -582,8 +582,6 @@ class MainWindow(QMainWindow):
         desktop = QStandardPaths.writableLocation(
             QStandardPaths.StandardLocation.DesktopLocation
         )
-
-        default_name = "frame.png"
         initial_path = desktop + "/" + default_name
 
         path, _ = QFileDialog.getSaveFileName(
