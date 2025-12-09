@@ -154,6 +154,16 @@ def _make_inferno_lut() -> np.ndarray:
     ]
     return _make_lut_from_stops(stops)
 
+def _make_ocean_lut() -> np.ndarray:
+    # Ocean: deep-blue → blue → cyan → turquoise → pale-aqua
+    stops = [
+        (0.0,  (  0,   5,  30)),   # deep navy
+        (0.25, (  0,  60, 125)),   # rich ocean blue
+        (0.50, (  0, 140, 190)),   # cyan-blue mix
+        (0.75, (  0, 200, 175)),   # turquoise
+        (1.0,  (180, 245, 240)),   # pale aqua
+    ]
+    return _make_lut_from_stops(stops)
 
 def _make_plasma_lut() -> np.ndarray:
     stops = [
@@ -191,6 +201,7 @@ def _make_turbo_lut() -> np.ndarray:
 
 GRAY_LUT      = _make_gray_lut()
 INFERNO_LUT   = _make_inferno_lut()
+OCEAN_LUT     = _make_ocean_lut()
 VIRIDIS_LUT   = _make_viridis_lut()
 PLASMA_LUT    = _make_plasma_lut()
 MAGMA_LUT     = _make_magma_lut()
@@ -201,6 +212,7 @@ DOOM_FIRE_LUT = _make_doom_fire_lut()
 COLOR_MAPS = {
     "Gray": GRAY_LUT,
     "Inferno": INFERNO_LUT,
+    "Ocean": OCEAN_LUT,
     "Viridis": VIRIDIS_LUT,
     "Plasma": PLASMA_LUT,
     "Magma": MAGMA_LUT,
