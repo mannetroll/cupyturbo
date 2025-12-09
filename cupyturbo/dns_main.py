@@ -350,7 +350,17 @@ class MainWindow(QMainWindow):
 
         # window setup
         # GPU/CPU title selection (no extra logic, just based on CuPy backend)
-        title_backend = "CuPy" if self.sim.state.backend == "gpu" else "NumPy"
+        # GPU/CPU title selection
+        # title_backend = "CuPy" if self.sim.state.backend == "gpu" else "NumPy"
+        title_backend = "NumPy"
+        try:
+            import cupy as cp
+            props = cp.cuda.runtime.getDeviceProperties(0)
+            gpu_name = props["name"].decode()  # e.g. "NVIDIA GeForce RTX 3090"
+            title_backend = f"CuPy: {gpu_name}"
+        except Exception:
+            pass
+
         self.setWindowTitle(f"2D Turbulence ({title_backend}) © Mannetroll")
         self.resize(self.sim.px + 40, self.sim.py + 120)
 
