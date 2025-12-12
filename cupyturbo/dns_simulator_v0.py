@@ -84,7 +84,15 @@ def get_xp(backend: Literal["cpu", "gpu", "auto"] = "auto"):
     # Auto-select: try GPU first
     if backend == "auto":
         if _cp is not None:
-            return _cp
+            try:
+                # Touch CUDA runtime to ensure a device is actually usable
+                print(" Checking GPU device")
+                dev = _cp.cuda.Device()  # may raise if no GPU
+                print(f" Using GPU device: {dev.id}")
+                return _cp
+            except Exception:
+                print(" Exception...")
+                pass
         return _np
 
     # Explicit GPU / CPU selection
@@ -95,7 +103,6 @@ def get_xp(backend: Literal["cpu", "gpu", "auto"] = "auto"):
 
     # backend == "cpu"
     return _np
-
 
 # ---------------------------------------------------------------------------
 # Fortran-style random generator used in PAO, port of frand(seed)
@@ -225,11 +232,6 @@ class DnsState:
     scratch1: any = None
     scratch2: any = None
 
-    # Precomputed index grids for STEP3 (avoid per-step allocations)
-    step3_z_indices: any = None
-    step3_kx_indices: any = None
-    step3_z_spec: any = None
-
     def sync(self):
         """For a CuPy backend, force synchronization at convenient checkpoints."""
         if self.backend == "gpu":
@@ -313,19 +315,6 @@ def create_dns_state(
 
     state.scratch1 = xp.zeros((NZ, NX_half), dtype=xp.complex64)
     state.scratch2 = xp.zeros((NZ, NX_half), dtype=xp.complex64)
-
-    # Precompute index grids used in STEP3 (avoid per-step allocations)
-    NZ = state.NZ
-    NX_half = state.NX // 2
-    state.step3_z_indices = xp.arange(NZ, dtype=xp.int32)
-    state.step3_kx_indices = xp.arange(NX_half, dtype=xp.int32)
-    NZ_half = NZ // 2
-    zi = state.step3_z_indices
-    state.step3_z_spec = xp.where(
-        zi <= (NZ_half - 1),
-        zi,
-        zi + NZ_half,
-    )
 
     return state
 
@@ -841,8 +830,12 @@ def dns_step3(S: DnsState) -> None:
     #   if Z <= NZ/2      => z_spec = Z-1
     #   else              => z_spec = Z+NZ/2-1
     NZ_half = NZ // 2
-    z_indices = S.step3_z_indices
-    z_spec = S.step3_z_spec  # shape (NZ,)
+    z_indices = xp.arange(NZ, dtype=xp.int32)
+    z_spec = xp.where(
+        z_indices <= (NZ_half - 1),
+        z_indices,
+        z_indices + NZ_half
+    )  # shape (NZ,)
 
     # Gather UC(X,Z_spec,1..3) from UC_full for X=0..NX/2-1
     # uc_full layout: [comp, z, kx]
@@ -850,7 +843,7 @@ def dns_step3(S: DnsState) -> None:
     uc1 = uc_full[1]
     uc2 = uc_full[2]
 
-    kx_idx = S.step3_kx_indices          # 0..NX_half-1
+    kx_idx = xp.arange(NX_half, dtype=xp.int32)          # 0..NX_half-1
 
     # Advanced indexing: (NZ, NX_half)
     uc1_th = uc0[z_spec[:, None], kx_idx[None, :]]
@@ -951,7 +944,7 @@ def dns_step3(S: DnsState) -> None:
     w0   = om[:, 0]                 # (NZ,), complex
     gz1d = gamma_1d                 # (NZ,)
 
-    z_idx = S.step3_z_indices
+    z_idx = xp.arange(NZ, dtype=xp.int32)
     mask = (z_idx >= 1) & (xp.abs(gz1d) > 0.0)
 
     # OM2 / GAMMA only where mask is true (CUDA-style conditional)
@@ -971,8 +964,8 @@ def dns_step3(S: DnsState) -> None:
     #   uc_full[1,z,kx] = out2(z,kx)
     # z_spec here is simply Z-1 (0..NZ-1), as in k_step3_update_uc_from_om2.
     # -----------------------------
-    z_spec2 = S.step3_z_indices
-    kx_idx2 = S.step3_kx_indices
+    z_spec2 = xp.arange(NZ, dtype=xp.int32)
+    kx_idx2 = xp.arange(NX_half, dtype=xp.int32)
 
     uc0 = uc_full[0]
     uc1p = uc_full[1]
