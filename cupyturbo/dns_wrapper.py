@@ -28,7 +28,7 @@ class NumPyDnsSimulator:
     VAR_OMEGA = 3
     VAR_STREAM = 4
 
-    def __init__(self, n: int = 256, re: float = 10000.0, k0: float = 10.0,  cfl: float = 0.75):
+    def __init__(self, n: int = 384, re: float = 10000.0, k0: float = 10.0,  cfl: float = 0.75):
         self.N = int(n)
         self.m = 3 * self.N
         self.re = float(re)

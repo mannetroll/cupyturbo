@@ -28,6 +28,8 @@ from PyQt6.QtWidgets import (
 from cupyturbo.dns_wrapper import NumPyDnsSimulator
 from cupyturbo import dns_simulator as dns_all
 
+# Update GUI only every UPDATE_INTERVAL frame
+UPDATE_INTERVAL = 5
 
 # Simple helper: build a 256x3 uint8 LUT from color stops in 0..1
 # stops: list of (pos, (r,g,b)) with pos in [0,1], r,g,b in [0,255]
@@ -758,8 +760,6 @@ class MainWindow(QMainWindow):
         # Count frames since the last GUI update
         self._status_update_counter += 1
 
-        # Update GUI only every 10 frames
-        UPDATE_INTERVAL = 10
         if self._status_update_counter >= UPDATE_INTERVAL:
             pixels = self.sim.get_frame_pixels()
             self._update_image(pixels)
