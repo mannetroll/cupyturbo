@@ -29,7 +29,7 @@ from cupyturbo.dns_wrapper import NumPyDnsSimulator
 from cupyturbo import dns_simulator as dns_all
 
 # Update GUI only every UPDATE_INTERVAL frame
-UPDATE_INTERVAL = 5
+UPDATE_INTERVAL = 40
 
 # Simple helper: build a 256x3 uint8 LUT from color stops in 0..1
 # stops: list of (pos, (r,g,b)) with pos in [0,1], r,g,b in [0,255]
