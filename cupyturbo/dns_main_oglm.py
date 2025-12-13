@@ -27,15 +27,43 @@ from PyQt6.QtWidgets import (
 )
 
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
-from PyQt6.QtOpenGL import (  # <-- FIX: these are in QtOpenGL in PyQt6
+from PyQt6.QtOpenGL import (
     QOpenGLShaderProgram,
     QOpenGLShader,
     QOpenGLBuffer,
-    QOpenGLVertexArrayObject, QOpenGLFunctions_4_1_Core,
+    QOpenGLVertexArrayObject,
+    QOpenGLFunctions_4_1_Core,
 )
 
 from cupyturbo import dns_simulator as dns_all
 from cupyturbo.dns_wrapper import NumPyDnsSimulator
+
+
+# -----------------------------------------------------------------------------
+# OpenGL constants (Qt function wrappers don't provide GL_* constants)
+# -----------------------------------------------------------------------------
+GL_DEPTH_TEST = 0x0B71
+GL_COLOR_BUFFER_BIT = 0x00004000
+GL_TRIANGLES = 0x0004
+GL_FLOAT = 0x1406
+
+GL_TEXTURE_2D = 0x0DE1
+GL_TEXTURE0 = 0x84C0
+GL_TEXTURE1 = 0x84C1
+GL_UNPACK_ALIGNMENT = 0x0CF5
+
+GL_NEAREST = 0x2600
+GL_CLAMP_TO_EDGE = 0x812F
+GL_TEXTURE_MIN_FILTER = 0x2801
+GL_TEXTURE_MAG_FILTER = 0x2800
+GL_TEXTURE_WRAP_S = 0x2802
+GL_TEXTURE_WRAP_T = 0x2803
+
+GL_R8 = 0x8229
+GL_RGB8 = 0x8051
+GL_RED = 0x1903
+GL_RGB = 0x1907
+GL_UNSIGNED_BYTE = 0x1401
 
 
 # -----------------------------------------------------------------------------
@@ -283,7 +311,7 @@ class GLColormapWidget(QOpenGLWidget):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
 
-        self._gl: Optional[QOpenGLFunctions] = None
+        self._gl: Optional[QOpenGLFunctions_4_1_Core] = None
         self._prog: Optional[QOpenGLShaderProgram] = None
         self._vao: Optional[QOpenGLVertexArrayObject] = None
         self._vbo: Optional[QOpenGLBuffer] = None
@@ -325,7 +353,7 @@ class GLColormapWidget(QOpenGLWidget):
         self._gl.initializeOpenGLFunctions()
         gl = self._gl
 
-        gl.glDisable(gl.GL_DEPTH_TEST)
+        gl.glDisable(GL_DEPTH_TEST)
 
         vs = """
         #version 330 core
@@ -384,9 +412,9 @@ class GLColormapWidget(QOpenGLWidget):
         prog.bind()
         stride = 4 * 4
         gl.glEnableVertexAttribArray(0)
-        gl.glVertexAttribPointer(0, 2, gl.GL_FLOAT, False, stride, 0)
+        gl.glVertexAttribPointer(0, 2, GL_FLOAT, False, stride, 0)
         gl.glEnableVertexAttribArray(1)
-        gl.glVertexAttribPointer(1, 2, gl.GL_FLOAT, False, stride, 8)
+        gl.glVertexAttribPointer(1, 2, GL_FLOAT, False, stride, 8)
         prog.release()
 
         vbo.release()
@@ -395,34 +423,34 @@ class GLColormapWidget(QOpenGLWidget):
         self._tex_frame = gl.glGenTextures(1)
         self._tex_lut = gl.glGenTextures(1)
 
-        gl.glPixelStorei(gl.GL_UNPACK_ALIGNMENT, 1)
+        gl.glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
 
-        gl.glBindTexture(gl.GL_TEXTURE_2D, self._tex_frame)
-        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_NEAREST)
-        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAG_FILTER, gl.GL_NEAREST)
-        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_S, gl.GL_CLAMP_TO_EDGE)
-        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_T, gl.GL_CLAMP_TO_EDGE)
-        gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
+        gl.glBindTexture(GL_TEXTURE_2D, self._tex_frame)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+        gl.glBindTexture(GL_TEXTURE_2D, 0)
 
-        gl.glBindTexture(gl.GL_TEXTURE_2D, self._tex_lut)
-        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_NEAREST)
-        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAG_FILTER, gl.GL_NEAREST)
-        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_S, gl.GL_CLAMP_TO_EDGE)
-        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_T, gl.GL_CLAMP_TO_EDGE)
+        gl.glBindTexture(GL_TEXTURE_2D, self._tex_lut)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
 
         default_lut = np.ascontiguousarray(COLOR_MAPS.get(DEFAULT_CMAP_NAME, GRAY_LUT), dtype=np.uint8)
         gl.glTexImage2D(
-            gl.GL_TEXTURE_2D,
+            GL_TEXTURE_2D,
             0,
-            gl.GL_RGB8,
+            GL_RGB8,
             256,
             1,
             0,
-            gl.GL_RGB,
-            gl.GL_UNSIGNED_BYTE,
+            GL_RGB,
+            GL_UNSIGNED_BYTE,
             default_lut.tobytes(),
         )
-        gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
+        gl.glBindTexture(GL_TEXTURE_2D, 0)
 
         self._have_textures = True
         self._upload_pending()
@@ -440,25 +468,25 @@ class GLColormapWidget(QOpenGLWidget):
         self._upload_pending()
 
         gl.glClearColor(0.0, 0.0, 0.0, 1.0)
-        gl.glClear(gl.GL_COLOR_BUFFER_BIT)
+        gl.glClear(GL_COLOR_BUFFER_BIT)
 
         self._prog.bind()
 
-        gl.glActiveTexture(gl.GL_TEXTURE0)
-        gl.glBindTexture(gl.GL_TEXTURE_2D, self._tex_frame)
+        gl.glActiveTexture(GL_TEXTURE0)
+        gl.glBindTexture(GL_TEXTURE_2D, self._tex_frame)
         self._prog.setUniformValue("uFrame", 0)
 
-        gl.glActiveTexture(gl.GL_TEXTURE1)
-        gl.glBindTexture(gl.GL_TEXTURE_2D, self._tex_lut)
+        gl.glActiveTexture(GL_TEXTURE1)
+        gl.glBindTexture(GL_TEXTURE_2D, self._tex_lut)
         self._prog.setUniformValue("uLUT", 1)
 
         self._vao.bind()
-        gl.glDrawArrays(gl.GL_TRIANGLES, 0, 6)
+        gl.glDrawArrays(GL_TRIANGLES, 0, 6)
         self._vao.release()
 
-        gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
-        gl.glActiveTexture(gl.GL_TEXTURE0)
-        gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
+        gl.glBindTexture(GL_TEXTURE_2D, 0)
+        gl.glActiveTexture(GL_TEXTURE0)
+        gl.glBindTexture(GL_TEXTURE_2D, 0)
 
         self._prog.release()
 
@@ -467,60 +495,60 @@ class GLColormapWidget(QOpenGLWidget):
             return
         gl = self._gl
 
-        gl.glPixelStorei(gl.GL_UNPACK_ALIGNMENT, 1)
+        gl.glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
 
         if self._pending_lut is not None:
             lut = self._pending_lut
             self._pending_lut = None
-            gl.glBindTexture(gl.GL_TEXTURE_2D, self._tex_lut)
+            gl.glBindTexture(GL_TEXTURE_2D, self._tex_lut)
             gl.glTexSubImage2D(
-                gl.GL_TEXTURE_2D,
+                GL_TEXTURE_2D,
                 0,
                 0,
                 0,
                 256,
                 1,
-                gl.GL_RGB,
-                gl.GL_UNSIGNED_BYTE,
+                GL_RGB,
+                GL_UNSIGNED_BYTE,
                 lut.tobytes(),
             )
-            gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
+            gl.glBindTexture(GL_TEXTURE_2D, 0)
 
         if self._pending_frame is not None:
             pix = self._pending_frame
             self._pending_frame = None
 
             h, w = pix.shape
-            gl.glBindTexture(gl.GL_TEXTURE_2D, self._tex_frame)
+            gl.glBindTexture(GL_TEXTURE_2D, self._tex_frame)
 
             if (w != self._frame_w) or (h != self._frame_h):
                 self._frame_w = w
                 self._frame_h = h
                 gl.glTexImage2D(
-                    gl.GL_TEXTURE_2D,
+                    GL_TEXTURE_2D,
                     0,
-                    gl.GL_R8,
+                    GL_R8,
                     w,
                     h,
                     0,
-                    gl.GL_RED,
-                    gl.GL_UNSIGNED_BYTE,
+                    GL_RED,
+                    GL_UNSIGNED_BYTE,
                     pix.tobytes(),
                 )
             else:
                 gl.glTexSubImage2D(
-                    gl.GL_TEXTURE_2D,
+                    GL_TEXTURE_2D,
                     0,
                     0,
                     0,
                     w,
                     h,
-                    gl.GL_RED,
-                    gl.GL_UNSIGNED_BYTE,
+                    GL_RED,
+                    GL_UNSIGNED_BYTE,
                     pix.tobytes(),
                 )
 
-            gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
+            gl.glBindTexture(GL_TEXTURE_2D, 0)
 
 
 class MainWindow(QMainWindow):
@@ -992,7 +1020,7 @@ class MainWindow(QMainWindow):
 def main() -> None:
     # macOS: request a core profile context. (Apple supports up to 4.1 core.)
     fmt = QSurfaceFormat()
-    fmt.setVersion(3, 3)
+    fmt.setVersion(4, 1)
     fmt.setProfile(QSurfaceFormat.OpenGLContextProfile.CoreProfile)
     fmt.setDepthBufferSize(0)
     fmt.setStencilBufferSize(0)
