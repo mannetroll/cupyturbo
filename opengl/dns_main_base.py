@@ -1,21 +1,14 @@
-# dns_main_oglw.py
-# (Option C: QOpenGLWidget + textures + LUT shader) — Win11Pro version
-
+# dns_main_base.py
+# (Base: NO OpenGL) — shared UI + simulator + LUTs
 import colorsys
 import os
-import sys
 import time
-import faulthandler
-from typing import Any, Optional, Tuple
+from typing import Optional, Tuple
 
 import numpy as np
-from PyQt6 import sip
 
 from PyQt6.QtCore import QSize, QTimer, Qt, QStandardPaths
-from PyQt6.QtGui import (
-    QFontDatabase,
-    QSurfaceFormat,
-)
+from PyQt6.QtGui import QFontDatabase
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -32,41 +25,8 @@ from PyQt6.QtWidgets import (
     QLineEdit,
 )
 
-from PyQt6.QtOpenGLWidgets import QOpenGLWidget
-
-# IMPORTANT (Win11 / your PyQt6 build):
-# These are NOT in PyQt6.QtGui for you. Import from QtOpenGL.
-from PyQt6.QtOpenGL import (
-    QOpenGLShaderProgram,
-    QOpenGLShader,
-    QOpenGLBuffer,
-    QOpenGLVertexArrayObject,
-)
-
 from cupyturbo import dns_simulator as dns_all
 from cupyturbo.dns_wrapper import NumPyDnsSimulator
-
-
-# -----------------------------------------------------------------------------
-# Debug helpers
-# -----------------------------------------------------------------------------
-def _dbg(msg: str) -> None:
-    sys.stderr.write(msg + "\n")
-    sys.stderr.flush()
-
-
-def _gl_err(gl: Any, where: str) -> None:
-    # glGetError is cheap enough if called a handful of times (not every frame).
-    try:
-        e = int(gl.glGetError())
-    except Exception:
-        return
-    if e != 0:
-        _dbg(f"[GL-ERR] {where}: 0x{e:04X}")
-
-
-# Enable Python-level crash dumps (won't always catch native faults, but helps sometimes)
-faulthandler.enable(all_threads=True)
 
 
 # -----------------------------------------------------------------------------
@@ -314,328 +274,23 @@ DEFAULT_CMAP_NAME = "Magma"
 
 
 # -----------------------------------------------------------------------------
-# OpenGL colormap widget
+# Base window (NO OpenGL imports here)
 # -----------------------------------------------------------------------------
-class GLColormapWidget(QOpenGLWidget):
+class MainWindowBase(QMainWindow):
     """
-    Displays a single-channel uint8 frame texture with a 256x1 RGB LUT texture.
-    Colormapping happens in the fragment shader.
+    Shared UI + simulation loop. A concrete frontend must provide:
+      - self.view: a QWidget with set_frame(pixels_u8) and set_lut(lut_rgb)
+      - view should support grabFramebuffer() for save (as QOpenGLWidget does)
     """
 
-    def __init__(self, parent=None) -> None:
-        super().__init__(parent)
-
-        self._gl: Optional[Any] = None
-        self._prog: Optional[QOpenGLShaderProgram] = None
-        self._vao: Optional[QOpenGLVertexArrayObject] = None
-        self._vbo: Optional[QOpenGLBuffer] = None
-
-        self._tex_frame: int = 0
-        self._tex_lut: int = 0
-
-        self._frame_w: int = 0
-        self._frame_h: int = 0
-
-        self._pending_frame: Optional[np.ndarray] = None  # HxW uint8
-        self._pending_lut: Optional[np.ndarray] = None    # 256x3 uint8
-
-        self._have_textures: bool = False
-        self._logged_upload_once: bool = False
-
-    def set_frame(self, pixels_u8: np.ndarray) -> None:
-        pix = np.asarray(pixels_u8, dtype=np.uint8)
-        if pix.ndim != 2:
-            return
-        self._pending_frame = np.ascontiguousarray(pix)
-
-        if self._have_textures:
-            self.makeCurrent()
-            self._upload_pending()
-            self.doneCurrent()
-        self.update()
-
-    def set_lut(self, lut_rgb: np.ndarray) -> None:
-        lut = np.asarray(lut_rgb, dtype=np.uint8)
-        if lut.shape != (256, 3):
-            return
-        self._pending_lut = np.ascontiguousarray(lut)
-
-        if self._have_textures:
-            self.makeCurrent()
-            self._upload_pending()
-            self.doneCurrent()
-        self.update()
-
-    def initializeGL(self) -> None:
-        _dbg("[GL] initializeGL: enter")
-
-        ctx = self.context()
-        if ctx is None:
-            _dbg("[GL] initializeGL: ctx is None")
-            return
-
-        fmt = ctx.format()
-        _dbg(f"[GL] Context format: {fmt.majorVersion()}.{fmt.minorVersion()} profile={int(fmt.profile())}")
-
-        self._gl = ctx.functions()  # type: ignore[assignment]
-        gl = self._gl
-        if gl is None:
-            _dbg("[GL] initializeGL: ctx.functions() returned None")
-            return
-
-        try:
-            gl.glDisable(gl.GL_DEPTH_TEST)
-            _gl_err(gl, "glDisable")
-            _dbg("[GL] depth test disabled")
-
-            vs = """
-            #version 330 core
-            layout(location = 0) in vec2 aPos;
-            layout(location = 1) in vec2 aUV;
-            out vec2 vUV;
-            void main() {
-                vUV = aUV;
-                gl_Position = vec4(aPos, 0.0, 1.0);
-            }
-            """
-
-            fs = """
-            #version 330 core
-            in vec2 vUV;
-            out vec4 fragColor;
-
-            uniform sampler2D uFrame; // R8 normalized
-            uniform sampler2D uLUT;   // 256x1 RGB
-
-            void main() {
-                float v = texture(uFrame, vUV).r; // 0..1
-                float x = (v * 255.0 + 0.5) / 256.0; // sample center in LUT
-                vec3 rgb = texture(uLUT, vec2(x, 0.5)).rgb;
-                fragColor = vec4(rgb, 1.0);
-            }
-            """
-
-            prog = QOpenGLShaderProgram()
-            prog.addShaderFromSourceCode(QOpenGLShader.ShaderTypeBit.Vertex, vs)
-            prog.addShaderFromSourceCode(QOpenGLShader.ShaderTypeBit.Fragment, fs)
-            prog.link()
-            if not prog.isLinked():
-                _dbg("[GL] Shader link FAILED:")
-                _dbg(prog.log())
-                return
-            self._prog = prog
-            _dbg("[GL] shader program linked")
-
-            verts = np.array(
-                [
-                    -1.0, -1.0, 0.0, 0.0,
-                     1.0, -1.0, 1.0, 0.0,
-                     1.0,  1.0, 1.0, 1.0,
-
-                    -1.0, -1.0, 0.0, 0.0,
-                     1.0,  1.0, 1.0, 1.0,
-                    -1.0,  1.0, 0.0, 1.0,
-                ],
-                dtype=np.float32,
-            )
-
-            vao = QOpenGLVertexArrayObject()
-            vao.create()
-            vao.bind()
-            self._vao = vao
-
-            vbo = QOpenGLBuffer(QOpenGLBuffer.Type.VertexBuffer)
-            vbo.create()
-            vbo.bind()
-            vbo.allocate(verts.tobytes(), verts.nbytes)
-            self._vbo = vbo
-            _dbg("[GL] VAO/VBO allocated")
-
-            prog.bind()
-            stride = 4 * 4  # 4 floats per vertex * 4 bytes
-            gl.glEnableVertexAttribArray(0)
-            gl.glVertexAttribPointer(0, 2, gl.GL_FLOAT, False, stride, sip.voidptr(0))
-            gl.glEnableVertexAttribArray(1)
-            gl.glVertexAttribPointer(1, 2, gl.GL_FLOAT, False, stride, sip.voidptr(8))
-            _gl_err(gl, "vertex attrib setup")
-            prog.release()
-
-            vbo.release()
-            vao.release()
-            _dbg("[GL] attrib pointers set")
-
-            self._tex_frame = gl.glGenTextures(1)
-            self._tex_lut = gl.glGenTextures(1)
-            _gl_err(gl, "glGenTextures")
-            _dbg(f"[GL] textures created: frame={self._tex_frame}, lut={self._tex_lut}")
-
-            gl.glPixelStorei(gl.GL_UNPACK_ALIGNMENT, 1)
-
-            # frame texture
-            gl.glBindTexture(gl.GL_TEXTURE_2D, self._tex_frame)
-            gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_NEAREST)
-            gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAG_FILTER, gl.GL_NEAREST)
-            gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_S, gl.GL_CLAMP_TO_EDGE)
-            gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_T, gl.GL_CLAMP_TO_EDGE)
-            gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
-            _gl_err(gl, "frame texture params")
-
-            # LUT texture
-            gl.glBindTexture(gl.GL_TEXTURE_2D, self._tex_lut)
-            gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_NEAREST)
-            gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAG_FILTER, gl.GL_NEAREST)
-            gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_S, gl.GL_CLAMP_TO_EDGE)
-            gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_T, gl.GL_CLAMP_TO_EDGE)
-
-            default_lut = np.ascontiguousarray(COLOR_MAPS.get(DEFAULT_CMAP_NAME, GRAY_LUT), dtype=np.uint8)
-
-            # IMPORTANT: upload as bytes (safe), not as raw pointer
-            gl.glTexImage2D(
-                gl.GL_TEXTURE_2D,
-                0,
-                gl.GL_RGB8,
-                256,
-                1,
-                0,
-                gl.GL_RGB,
-                gl.GL_UNSIGNED_BYTE,
-                default_lut.tobytes(),
-            )
-            gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
-            _gl_err(gl, "lut tex image")
-            _dbg("[GL] LUT uploaded")
-
-            self._have_textures = True
-            self._upload_pending()
-
-            _dbg("[GL] initializeGL: done")
-
-        except Exception as e:
-            # Won't catch native crashes, but will catch Python-level issues
-            _dbg(f"[GL] initializeGL: Python exception: {type(e).__name__}: {e}")
-            raise
-
-    def resizeGL(self, w: int, h: int) -> None:
-        if self._gl is None:
-            return
-        self._gl.glViewport(0, 0, w, h)
-
-    def paintGL(self) -> None:
-        if self._gl is None or self._prog is None or self._vao is None:
-            return
-
-        gl = self._gl
-        self._upload_pending()
-
-        gl.glClearColor(0.0, 0.0, 0.0, 1.0)
-        gl.glClear(gl.GL_COLOR_BUFFER_BIT)
-
-        self._prog.bind()
-
-        gl.glActiveTexture(gl.GL_TEXTURE0)
-        gl.glBindTexture(gl.GL_TEXTURE_2D, self._tex_frame)
-        self._prog.setUniformValue("uFrame", 0)
-
-        gl.glActiveTexture(gl.GL_TEXTURE1)
-        gl.glBindTexture(gl.GL_TEXTURE_2D, self._tex_lut)
-        self._prog.setUniformValue("uLUT", 1)
-
-        self._vao.bind()
-        gl.glDrawArrays(gl.GL_TRIANGLES, 0, 6)
-        self._vao.release()
-
-        gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
-        gl.glActiveTexture(gl.GL_TEXTURE0)
-        gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
-
-        self._prog.release()
-
-    def _upload_pending(self) -> None:
-        if self._gl is None:
-            return
-        gl = self._gl
-
-        gl.glPixelStorei(gl.GL_UNPACK_ALIGNMENT, 1)
-
-        if self._pending_lut is not None:
-            lut = self._pending_lut
-            self._pending_lut = None
-
-            gl.glBindTexture(gl.GL_TEXTURE_2D, self._tex_lut)
-            gl.glTexSubImage2D(
-                gl.GL_TEXTURE_2D,
-                0,
-                0,
-                0,
-                256,
-                1,
-                gl.GL_RGB,
-                gl.GL_UNSIGNED_BYTE,
-                lut.tobytes(),  # safe copy
-            )
-            gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
-            if not self._logged_upload_once:
-                _dbg("[GL] upload: LUT subimage")
-                _gl_err(gl, "lut subimage")
-
-        if self._pending_frame is not None:
-            pix = self._pending_frame
-            self._pending_frame = None
-
-            h, w = pix.shape
-            gl.glBindTexture(gl.GL_TEXTURE_2D, self._tex_frame)
-
-            # (Re)allocate if size changed
-            if (w != self._frame_w) or (h != self._frame_h):
-                self._frame_w = w
-                self._frame_h = h
-                gl.glTexImage2D(
-                    gl.GL_TEXTURE_2D,
-                    0,
-                    gl.GL_R8,
-                    w,
-                    h,
-                    0,
-                    gl.GL_RED,
-                    gl.GL_UNSIGNED_BYTE,
-                    pix.tobytes(),  # safe copy
-                )
-                if not self._logged_upload_once:
-                    _dbg(f"[GL] upload: frame TexImage2D {w}x{h}")
-                    _gl_err(gl, "frame teximage")
-            else:
-                gl.glTexSubImage2D(
-                    gl.GL_TEXTURE_2D,
-                    0,
-                    0,
-                    0,
-                    w,
-                    h,
-                    gl.GL_RED,
-                    gl.GL_UNSIGNED_BYTE,
-                    pix.tobytes(),  # safe copy
-                )
-                if not self._logged_upload_once:
-                    _dbg(f"[GL] upload: frame TexSubImage2D {w}x{h}")
-                    _gl_err(gl, "frame texsubimage")
-
-            gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
-
-        self._logged_upload_once = True
-
-
-# -----------------------------------------------------------------------------
-# Main window
-# -----------------------------------------------------------------------------
-class MainWindow(QMainWindow):
     def __init__(self, sim: NumPyDnsSimulator) -> None:
         super().__init__()
 
         self.sim = sim
         self.current_cmap_name = DEFAULT_CMAP_NAME
 
-        self.gl_view = GLColormapWidget()
-        self.gl_view.setMinimumSize(1, 1)
+        self.view = self._create_view_widget()
+        self.view.setMinimumSize(1, 1)  # type: ignore[attr-defined]
 
         style = QApplication.style()
 
@@ -761,7 +416,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"2D Turbulence {title_backend} © Mannetroll")
 
         dw, dh = self._display_size_for_N(self.sim.N)
-        self.gl_view.setFixedSize(dw, dh)
+        self.view.setFixedSize(dw, dh)  # type: ignore[attr-defined]
         self.resize(dw + 40, dh + 120)
 
         self._sim_start_time = time.time()
@@ -775,6 +430,12 @@ class MainWindow(QMainWindow):
         self._update_status(self.sim.get_time(), self.sim.get_iteration(), None)
 
         self.on_start_clicked()
+
+    # ---- methods a frontend may override ----
+    def _create_view_widget(self) -> QWidget:
+        raise RuntimeError("MainWindowBase requires a frontend that provides a view widget.")
+
+    # ------------------------------------------------------------------
 
     @staticmethod
     def move_widgets(src_layout, dst_layout):
@@ -791,7 +452,7 @@ class MainWindow(QMainWindow):
 
         central = QWidget()
         main = QVBoxLayout(central)
-        main.addWidget(self.gl_view)
+        main.addWidget(self.view)
 
         row1 = QHBoxLayout()
         row1.addWidget(self.start_button)
@@ -836,7 +497,7 @@ class MainWindow(QMainWindow):
 
     def _apply_current_lut(self) -> None:
         lut = COLOR_MAPS.get(self.current_cmap_name, GRAY_LUT)
-        self.gl_view.set_lut(lut)
+        self.view.set_lut(lut)  # type: ignore[attr-defined]
 
     def _update_run_buttons(self) -> None:
         running = self.timer.isActive()
@@ -900,9 +561,7 @@ class MainWindow(QMainWindow):
 
         folder = f"cupyturbo_{N}_{self.sci_no_plus(Re)}_{K0}_{CFL}_{STEPS}"
 
-        desktop = QStandardPaths.writableLocation(
-            QStandardPaths.StandardLocation.DesktopLocation
-        )
+        desktop = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DesktopLocation)
 
         dlg = QFileDialog(self)
         dlg.setWindowTitle(f"Case: {folder}")
@@ -934,9 +593,7 @@ class MainWindow(QMainWindow):
         cmap_name = self.cmap_combo.currentText()
         default_name = f"cupyturbo_{var_name}_{cmap_name}.png"
 
-        desktop = QStandardPaths.writableLocation(
-            QStandardPaths.StandardLocation.DesktopLocation
-        )
+        desktop = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DesktopLocation)
         initial_path = desktop + "/" + default_name
 
         path, _ = QFileDialog.getSaveFileName(
@@ -946,7 +603,7 @@ class MainWindow(QMainWindow):
             "PNG images (*.png);;All files (*)",
         )
         if path:
-            img = self.gl_view.grabFramebuffer()
+            img = self.view.grabFramebuffer()  # type: ignore[attr-defined]
             img.save(path, "PNG")
 
     def on_variable_changed(self, index: int) -> None:
@@ -971,7 +628,7 @@ class MainWindow(QMainWindow):
         self.sim.set_N(N)
 
         dw, dh = self._display_size_for_N(N)
-        self.gl_view.setFixedSize(dw, dh)
+        self.view.setFixedSize(dw, dh)  # type: ignore[attr-defined]
 
         self._update_image(self.sim.get_frame_pixels())
 
@@ -1034,11 +691,7 @@ class MainWindow(QMainWindow):
             if elapsed > 0 and steps > 0:
                 fps = steps / elapsed
 
-            self._update_status(
-                self.sim.get_time(),
-                self.sim.get_iteration(),
-                fps,
-            )
+            self._update_status(self.sim.get_time(), self.sim.get_iteration(), fps)
             self._status_update_counter = 0
 
         if self.sim.get_iteration() >= self.sim.max_steps:
@@ -1070,7 +723,7 @@ class MainWindow(QMainWindow):
         pixels = np.asarray(pixels, dtype=np.uint8)
         if pixels.ndim != 2:
             return
-        self.gl_view.set_frame(pixels)
+        self.view.set_frame(pixels)  # type: ignore[attr-defined]
 
     def _update_status(self, t: float, it: int, fps: Optional[float]) -> None:
         fps_str = f"{fps:4.1f}" if fps is not None else " N/a"
@@ -1144,36 +797,3 @@ class MainWindow(QMainWindow):
             return
 
         super().keyPressEvent(event)
-
-
-# -----------------------------------------------------------------------------
-def main() -> None:
-    fmt = QSurfaceFormat()
-    fmt.setVersion(3, 3)
-    fmt.setProfile(QSurfaceFormat.OpenGLContextProfile.CoreProfile)
-    fmt.setDepthBufferSize(0)
-    fmt.setStencilBufferSize(0)
-    fmt.setSwapBehavior(QSurfaceFormat.SwapBehavior.DoubleBuffer)
-    QSurfaceFormat.setDefaultFormat(fmt)
-
-    app = QApplication(sys.argv)
-    sim = NumPyDnsSimulator()
-
-    _dbg("[APP] Constructing MainWindow...")
-    window = MainWindow(sim)
-    _dbg("[APP] MainWindow constructed")
-
-    screen = app.primaryScreen().availableGeometry()
-    g = window.geometry()
-    g.moveCenter(screen.center())
-    window.setGeometry(g)
-
-    _dbg("[APP] window.show() about to run...")
-    window.show()
-    _dbg("[APP] window.show() returned")
-
-    sys.exit(app.exec())
-
-
-if __name__ == "__main__":
-    main()
