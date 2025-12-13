@@ -1,19 +1,40 @@
 # dns_main_oglw.py
 # (Option C: QOpenGLWidget + textures + LUT shader) — Win11Pro version
+#
+# Native-crash debugging:
+#  - faulthandler enabled
+#  - very fine-grained checkpoints in initializeGL()
+#  - optional: force QT_OPENGL=desktop / software via env before Qt loads
+import faulthandler
+import os
 import sys
 from typing import Any, Optional
 
+# --- must be BEFORE importing any PyQt6 ---
+# Try forcing desktop OpenGL (WGL) instead of ANGLE.
+# In PowerShell you can also do:
+#   $env:QT_OPENGL="desktop"
+# or, to test software:
+#   $env:QT_OPENGL="software"
+os.environ.setdefault("QT_OPENGL", os.getenv("QT_OPENGL", "desktop"))
+
+# Qt plugin/GL logging can sometimes help:
+# os.environ.setdefault("QT_DEBUG_PLUGINS", "1")
+# os.environ.setdefault("QT_LOGGING_RULES", "qt.qpa.gl=true;qt.qpa.*=false")
+
+faulthandler.enable(all_threads=True)
+
 import numpy as np
 from PyQt6 import sip
-
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QSurfaceFormat
-from PyQt6.QtWidgets import QApplication
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
+from PyQt6.QtWidgets import QApplication
 
 from PyQt6.QtOpenGL import (
-    QOpenGLShaderProgram,
-    QOpenGLShader,
     QOpenGLBuffer,
+    QOpenGLShader,
+    QOpenGLShaderProgram,
     QOpenGLVertexArrayObject,
 )
 
@@ -32,9 +53,9 @@ def _dbg(msg: str) -> None:
     print(msg, flush=True)
 
 
-# -----------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 # OpenGL colormap widget
-# -----------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 class GLColormapWidget(QOpenGLWidget):
     """
     Displays a single-channel uint8 frame texture with a 256x1 RGB LUT texture.
@@ -87,19 +108,41 @@ class GLColormapWidget(QOpenGLWidget):
     def initializeGL(self) -> None:
         _dbg("[GL] initializeGL: enter")
 
+        # --- Step 1: context sanity ---
+        _dbg("[GL] step 1: self.context() ...")
         ctx = self.context()
+        _dbg("[GL] step 1: self.context() returned")
         if ctx is None:
             _dbg("[GL] initializeGL: NO CONTEXT")
             return
 
+        try:
+            fmt = ctx.format()
+            _dbg(
+                f"[GL] ctx.format: v={fmt.majorVersion()}.{fmt.minorVersion()} "
+                f"profile={int(fmt.profile())} renderable={fmt.renderableType()}"
+            )
+        except Exception as e:
+            _dbg(f"[GL] ctx.format() failed (non-fatal): {e!r}")
+
+        # --- Step 2: function table ---
+        _dbg("[GL] step 2: ctx.functions() ...")
         self._gl = ctx.functions()  # type: ignore[assignment]
+        _dbg("[GL] step 2: ctx.functions() returned")
         gl = self._gl
         if gl is None:
             _dbg("[GL] initializeGL: NO FUNCTIONS")
             return
 
+        # --- Step 3: simplest GL call ---
+        _dbg("[GL] step 3: glDisable(GL_DEPTH_TEST) ...")
         gl.glDisable(gl.GL_DEPTH_TEST)
+        _dbg("[GL] step 3: glDisable OK")
 
+        # If you crash before here, it’s context/functions creation, not your shader/texture code.
+
+        # --- Step 4: compile/link shaders ---
+        _dbg("[GL] step 4: build shaders ...")
         vs = """
         #version 330 core
         layout(location = 0) in vec2 aPos;
@@ -110,7 +153,6 @@ class GLColormapWidget(QOpenGLWidget):
             gl_Position = vec4(aPos, 0.0, 1.0);
         }
         """
-
         fs = """
         #version 330 core
         in vec2 vUV;
@@ -121,18 +163,24 @@ class GLColormapWidget(QOpenGLWidget):
 
         void main() {
             float v = texture(uFrame, vUV).r; // 0..1
-            float x = (v * 255.0 + 0.5) / 256.0; // sample center in LUT
+            float x = (v * 255.0 + 0.5) / 256.0;
             vec3 rgb = texture(uLUT, vec2(x, 0.5)).rgb;
             fragColor = vec4(rgb, 1.0);
         }
         """
 
         prog = QOpenGLShaderProgram()
+        _dbg("[GL] step 4.1: add vertex shader ...")
         prog.addShaderFromSourceCode(QOpenGLShader.ShaderTypeBit.Vertex, vs)
+        _dbg("[GL] step 4.2: add fragment shader ...")
         prog.addShaderFromSourceCode(QOpenGLShader.ShaderTypeBit.Fragment, fs)
+        _dbg("[GL] step 4.3: link ...")
         prog.link()
+        _dbg("[GL] step 4.4: link OK")
         self._prog = prog
 
+        # --- Step 5: VBO/VAO ---
+        _dbg("[GL] step 5: create VAO/VBO ...")
         verts = np.array(
             [
                 -1.0, -1.0, 0.0, 0.0,
@@ -157,6 +205,7 @@ class GLColormapWidget(QOpenGLWidget):
         vbo.allocate(verts.tobytes(), verts.nbytes)
         self._vbo = vbo
 
+        _dbg("[GL] step 5.1: setup attrib pointers ...")
         prog.bind()
         stride = 4 * 4
         gl.glEnableVertexAttribArray(0)
@@ -164,10 +213,13 @@ class GLColormapWidget(QOpenGLWidget):
         gl.glEnableVertexAttribArray(1)
         gl.glVertexAttribPointer(1, 2, gl.GL_FLOAT, False, stride, sip.voidptr(8))
         prog.release()
+        _dbg("[GL] step 5.2: attrib pointers OK")
 
         vbo.release()
         vao.release()
 
+        # --- Step 6: textures ---
+        _dbg("[GL] step 6: create textures ...")
         self._tex_frame = gl.glGenTextures(1)
         self._tex_lut = gl.glGenTextures(1)
 
@@ -186,7 +238,10 @@ class GLColormapWidget(QOpenGLWidget):
         gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_S, gl.GL_CLAMP_TO_EDGE)
         gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_T, gl.GL_CLAMP_TO_EDGE)
 
-        default_lut = np.ascontiguousarray(COLOR_MAPS.get(DEFAULT_CMAP_NAME, GRAY_LUT), dtype=np.uint8)
+        default_lut = np.ascontiguousarray(
+            COLOR_MAPS.get(DEFAULT_CMAP_NAME, GRAY_LUT),
+            dtype=np.uint8,
+        )
         gl.glTexImage2D(
             gl.GL_TEXTURE_2D,
             0,
@@ -202,6 +257,7 @@ class GLColormapWidget(QOpenGLWidget):
 
         self._have_textures = True
         self._upload_pending()
+
         _dbg("[GL] initializeGL: done")
 
     def resizeGL(self, w: int, h: int) -> None:
@@ -300,19 +356,25 @@ class GLColormapWidget(QOpenGLWidget):
             gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
 
 
-# -----------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 # Window: reuse base and only provide the view widget
-# -----------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 class MainWindow(MainWindowBase):
     def _create_view_widget(self) -> QOpenGLWidget:
         return GLColormapWidget()
 
 
-# -----------------------------------------------------------------------------
+# --------------------------------------------------------------------------
 def main() -> None:
+    # Strongly prefer Desktop OpenGL for QOpenGLWidget on Windows.
+    # Also make sure the attribute is set before creating QApplication.
+    QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseDesktopOpenGL, True)
+
+    # For debugging, start less strict than Core 3.3:
+    # If this works, you can move back to Core 3.3 later.
     fmt = QSurfaceFormat()
-    fmt.setVersion(3, 3)
-    fmt.setProfile(QSurfaceFormat.OpenGLContextProfile.CoreProfile)
+    fmt.setVersion(2, 0)
+    fmt.setProfile(QSurfaceFormat.OpenGLContextProfile.NoProfile)
     fmt.setDepthBufferSize(0)
     fmt.setStencilBufferSize(0)
     fmt.setSwapBehavior(QSurfaceFormat.SwapBehavior.DoubleBuffer)
@@ -321,9 +383,8 @@ def main() -> None:
     _dbg("[APP] Creating QApplication...")
     app = QApplication(sys.argv)
 
-    # Optional: keep your existing CuPy diagnostics
     try:
-        check_cupy()  # prints what you showed earlier; if you don't have it, remove this call
+        check_cupy()
     except Exception:
         pass
 
@@ -332,11 +393,6 @@ def main() -> None:
     _dbg("[APP] Constructing MainWindow...")
     window = MainWindow(sim)
     _dbg("[APP] MainWindow constructed")
-
-    screen = app.primaryScreen().availableGeometry()
-    g = window.geometry()
-    g.moveCenter(screen.center())
-    window.setGeometry(g)
 
     _dbg("[APP] window.show() about to run...")
     window.show()
