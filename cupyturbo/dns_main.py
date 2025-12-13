@@ -859,7 +859,7 @@ class MainWindow(QMainWindow):
 
         pix = QPixmap.fromImage(qimg)
         self.image_label.setPixmap(pix)
-        self.image_label.adjustSize()
+        #self.image_label.adjustSize()
 
     def _update_status(self, t: float, it: int, fps: Optional[float]) -> None:
         fps_str = f"{fps:4.1f}" if fps is not None else " N/a"
