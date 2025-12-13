@@ -372,7 +372,7 @@ class MainWindow(QMainWindow):
         # Update selector
         self.update_combo = QComboBox()
         self.update_combo.setToolTip("U: Update intervall")
-        self.update_combo.addItems(["1", "2", "5", "10", "20", "50"])
+        self.update_combo.addItems(["2", "5", "10", "20", "50"])
         self.update_combo.setCurrentText("2")
 
         self.auto_reset_checkbox = QCheckBox()
@@ -472,8 +472,8 @@ class MainWindow(QMainWindow):
         row1.addWidget(self.folder_button)
         row1.addWidget(self.cmap_combo)
         row1.addWidget(self.steps_combo)
-        row1.addWidget(self.auto_reset_checkbox)
         row1.addWidget(self.update_combo)
+        row1.addWidget(self.auto_reset_checkbox)
 
         # Second row
         row2 = QHBoxLayout()
@@ -858,7 +858,6 @@ class MainWindow(QMainWindow):
             )
 
         pix = QPixmap.fromImage(qimg)
-        self.image_label.setPixmap(pix)
         self.image_label.setPixmap(pix)
         self.image_label.adjustSize()
 
