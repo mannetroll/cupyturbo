@@ -5,7 +5,7 @@ from typing import Union
 import numpy as np
 import math
 import os
-from scipy import scipy_simulator as dns_all
+from scipyturbo import scipy_simulator as dns_all
 from PIL import Image
 
 

@@ -24,8 +24,8 @@ from PyQt6.QtWidgets import (
 )
 import numpy as np
 
-from scipy import scipy_simulator as dns_all
-from scipy.scipy_wrapper import NumPyDnsSimulator
+from scipyturbo import scipy_simulator as dns_all
+from scipyturbo.scipy_wrapper import NumPyDnsSimulator
 
 
 # Simple helper: build a 256x3 uint8 LUT from color stops in 0..1
@@ -467,7 +467,7 @@ class MainWindow(QMainWindow):
         # window setup
         import importlib.util
 
-        title_backend = "(NumPy)"
+        title_backend = "(SciPy)"
         if importlib.util.find_spec("cupy") is not None:
             import cupy as cp
             try:
