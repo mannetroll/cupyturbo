@@ -24,8 +24,8 @@ from PyQt6.QtWidgets import (
 )
 import numpy as np
 
-from cupyturbo import dns_simulator as dns_all
-from cupyturbo.dns_wrapper import NumPyDnsSimulator
+from scipy import scipy_simulator as dns_all
+from scipy.scipy_wrapper import NumPyDnsSimulator
 
 
 # Simple helper: build a 256x3 uint8 LUT from color stops in 0..1
