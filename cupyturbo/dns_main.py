@@ -6,7 +6,7 @@ import colorsys
 import numpy as np
 from typing import Optional
 
-from PyQt6.QtCore import Qt, QSize, QTimer
+from PyQt6.QtCore import QSize, QTimer
 from PyQt6.QtCore import QStandardPaths
 from PyQt6.QtGui import QImage, QPixmap, QFontDatabase
 from PyQt6.QtWidgets import (
@@ -274,7 +274,7 @@ def _setup_shortcuts(self):
     def sc(key, fn):
         s = QShortcut(QKeySequence(key), self)
         s.setContext(Qt.ShortcutContext.ApplicationShortcut)
-        s.activated.connect(fn)
+        s.activated.connect(fn) # type: ignore[attr-defined]
         return s
 
     self._sc_v = sc("V", lambda: self.variable_combo.setCurrentIndex(
@@ -450,14 +450,17 @@ class MainWindow(QMainWindow):
         # GPU/CPU title selection (no extra logic, just based on CuPy backend)
         # GPU/CPU title selection
         # title_backend = "CuPy" if self.sim.state.backend == "gpu" else "NumPy"
+        import importlib.util
+
         title_backend = "(NumPy)"
-        try:
+        if importlib.util.find_spec("cupy") is not None:
             import cupy as cp
-            props = cp.cuda.runtime.getDeviceProperties(0)
-            gpu_name = props["name"].decode()  # e.g. "NVIDIA GeForce RTX 3090"
-            title_backend = f"(CuPy) {gpu_name}"
-        except Exception:
-            pass
+            try:
+                props = cp.cuda.runtime.getDeviceProperties(0)
+                gpu_name = props["name"].decode(errors="replace")
+                title_backend = f"(CuPy) {gpu_name}"
+            except (RuntimeError, OSError, ValueError, IndexError):
+                pass
 
         self.setWindowTitle(f"2D Turbulence {title_backend} © Mannetroll")
         self.resize(self.sim.px + 40, self.sim.py + 120)
@@ -601,7 +604,7 @@ class MainWindow(QMainWindow):
         raise ValueError(f"Unknown variable: {variable}")
 
     def _update_run_buttons(self) -> None:
-        """Enable/disable Start/Stop depending on timer state."""
+        """Enable/disable Start/Stop depending on the timer state."""
         running = self.timer.isActive()
         self.start_button.setEnabled(not running)
         self.stop_button.setEnabled(running)
