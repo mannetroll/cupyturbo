@@ -101,7 +101,7 @@ class NumPyDnsSimulator:
         dns_all.dns_step2a(S)
 
         # Call NEXTDT every mod_next_dt iterations
-        if mod_next_dt <= 1 or ((self.iteration + 1) % mod_next_dt == 0):
+        if (self.iteration % mod_next_dt) == 0:
             dns_all.next_dt(S)
 
         S.t += dt_old
@@ -339,7 +339,7 @@ if __name__ == "__main__":
 
     print("Starting DNS simulation")
     for i in range(10):
-        sim.step()
+        sim.step(1)
         d = sim.diagnostics()
         print(f"Step {i+1:2d}: T={d['t']:.6f}, DT={d['dt']:.6f}, CN={d['cn']:.6f}")
 
