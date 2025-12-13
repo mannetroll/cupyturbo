@@ -1,45 +1,32 @@
 # dns_main_oglw.py
 # (Option C: QOpenGLWidget + textures + LUT shader) — Win11Pro version
-#
-# Native-crash debugging:
-#  - faulthandler enabled
-#  - very fine-grained checkpoints in initializeGL()
-#  - optional: force QT_OPENGL=desktop / software via env before Qt loads
-import faulthandler
-import os
+# Uses same OpenGL approach as the working dns_main_oglm.py:
+#   - QOpenGLFunctions_4_1_Core
+#   - explicit GL_* constants
+#   - uploads via .tobytes() (no raw pointers / sip.voidptr)
+#   - allocate textures immediately (never incomplete)
+#   - keep last frame/LUT so context recreation doesn't go black
+
+from __future__ import annotations
+
 import sys
-from typing import Any, Optional
-
-# --- must be BEFORE importing any PyQt6 ---
-# Try forcing desktop OpenGL (WGL) instead of ANGLE.
-# In PowerShell you can also do:
-#   $env:QT_OPENGL="desktop"
-# or, to test software:
-#   $env:QT_OPENGL="software"
-os.environ.setdefault("QT_OPENGL", os.getenv("QT_OPENGL", "desktop"))
-
-# Qt plugin/GL logging can sometimes help:
-# os.environ.setdefault("QT_DEBUG_PLUGINS", "1")
-# os.environ.setdefault("QT_LOGGING_RULES", "qt.qpa.gl=true;qt.qpa.*=false")
-
-faulthandler.enable(all_threads=True)
+from typing import Optional
 
 import numpy as np
-from PyQt6 import sip
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QSurfaceFormat
-from PyQt6.QtOpenGLWidgets import QOpenGLWidget
-from PyQt6.QtWidgets import QApplication
 
+from PyQt6.QtGui import QSurfaceFormat
+from PyQt6.QtWidgets import QApplication
+from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 from PyQt6.QtOpenGL import (
-    QOpenGLBuffer,
-    QOpenGLShader,
     QOpenGLShaderProgram,
+    QOpenGLShader,
+    QOpenGLBuffer,
     QOpenGLVertexArrayObject,
+    QOpenGLFunctions_4_1_Core,
 )
 
 from cupyturbo.dns_wrapper import NumPyDnsSimulator
-from cupyturbo.dns_simulator import check_cupy  # if you have this helper; otherwise remove
+from cupyturbo.dns_simulator import check_cupy  # if you have it; otherwise remove
 
 from dns_main_base import (
     COLOR_MAPS,
@@ -48,14 +35,36 @@ from dns_main_base import (
     MainWindowBase,
 )
 
+# -----------------------------------------------------------------------------
+# OpenGL constants (Qt function wrappers don't provide GL_* constants)
+# -----------------------------------------------------------------------------
+GL_DEPTH_TEST = 0x0B71
+GL_COLOR_BUFFER_BIT = 0x00004000
+GL_TRIANGLES = 0x0004
+GL_FLOAT = 0x1406
 
-def _dbg(msg: str) -> None:
-    print(msg, flush=True)
+GL_TEXTURE_2D = 0x0DE1
+GL_TEXTURE0 = 0x84C0
+GL_TEXTURE1 = 0x84C1
+GL_UNPACK_ALIGNMENT = 0x0CF5
+
+GL_NEAREST = 0x2600
+GL_CLAMP_TO_EDGE = 0x812F
+GL_TEXTURE_MIN_FILTER = 0x2801
+GL_TEXTURE_MAG_FILTER = 0x2800
+GL_TEXTURE_WRAP_S = 0x2802
+GL_TEXTURE_WRAP_T = 0x2803
+
+GL_TEXTURE_BASE_LEVEL = 0x813C
+GL_TEXTURE_MAX_LEVEL = 0x813D
+
+GL_R8 = 0x8229
+GL_RGB8 = 0x8051
+GL_RED = 0x1903
+GL_RGB = 0x1907
+GL_UNSIGNED_BYTE = 0x1401
 
 
-# --------------------------------------------------------------------------
-# OpenGL colormap widget
-# --------------------------------------------------------------------------
 class GLColormapWidget(QOpenGLWidget):
     """
     Displays a single-channel uint8 frame texture with a 256x1 RGB LUT texture.
@@ -65,7 +74,7 @@ class GLColormapWidget(QOpenGLWidget):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
 
-        self._gl: Optional[Any] = None
+        self._gl: Optional[QOpenGLFunctions_4_1_Core] = None
         self._prog: Optional[QOpenGLShaderProgram] = None
         self._vao: Optional[QOpenGLVertexArrayObject] = None
         self._vbo: Optional[QOpenGLBuffer] = None
@@ -78,15 +87,21 @@ class GLColormapWidget(QOpenGLWidget):
 
         self._pending_frame: Optional[np.ndarray] = None  # HxW uint8
         self._pending_lut: Optional[np.ndarray] = None    # 256x3 uint8
-
         self._have_textures: bool = False
+
+        # Keep last valid data so context recreates don't go black
+        self._last_frame: Optional[np.ndarray] = None      # HxW uint8
+        self._last_lut: np.ndarray = np.ascontiguousarray(
+            COLOR_MAPS.get(DEFAULT_CMAP_NAME, GRAY_LUT), dtype=np.uint8
+        )
 
     def set_frame(self, pixels_u8: np.ndarray) -> None:
         pix = np.asarray(pixels_u8, dtype=np.uint8)
         if pix.ndim != 2:
             return
-        self._pending_frame = np.ascontiguousarray(pix)
-
+        pix_c = np.ascontiguousarray(pix)
+        self._last_frame = pix_c
+        self._pending_frame = pix_c
         if self._have_textures:
             self.makeCurrent()
             self._upload_pending()
@@ -97,8 +112,9 @@ class GLColormapWidget(QOpenGLWidget):
         lut = np.asarray(lut_rgb, dtype=np.uint8)
         if lut.shape != (256, 3):
             return
-        self._pending_lut = np.ascontiguousarray(lut)
-
+        lut_c = np.ascontiguousarray(lut)
+        self._last_lut = lut_c
+        self._pending_lut = lut_c
         if self._have_textures:
             self.makeCurrent()
             self._upload_pending()
@@ -106,43 +122,12 @@ class GLColormapWidget(QOpenGLWidget):
         self.update()
 
     def initializeGL(self) -> None:
-        _dbg("[GL] initializeGL: enter")
-
-        # --- Step 1: context sanity ---
-        _dbg("[GL] step 1: self.context() ...")
-        ctx = self.context()
-        _dbg("[GL] step 1: self.context() returned")
-        if ctx is None:
-            _dbg("[GL] initializeGL: NO CONTEXT")
-            return
-
-        try:
-            fmt = ctx.format()
-            _dbg(
-                f"[GL] ctx.format: v={fmt.majorVersion()}.{fmt.minorVersion()} "
-                f"profile={int(fmt.profile())} renderable={fmt.renderableType()}"
-            )
-        except Exception as e:
-            _dbg(f"[GL] ctx.format() failed (non-fatal): {e!r}")
-
-        # --- Step 2: function table ---
-        _dbg("[GL] step 2: ctx.functions() ...")
-        self._gl = ctx.functions()  # type: ignore[assignment]
-        _dbg("[GL] step 2: ctx.functions() returned")
+        self._gl = QOpenGLFunctions_4_1_Core()
+        self._gl.initializeOpenGLFunctions()
         gl = self._gl
-        if gl is None:
-            _dbg("[GL] initializeGL: NO FUNCTIONS")
-            return
 
-        # --- Step 3: simplest GL call ---
-        _dbg("[GL] step 3: glDisable(GL_DEPTH_TEST) ...")
-        gl.glDisable(gl.GL_DEPTH_TEST)
-        _dbg("[GL] step 3: glDisable OK")
+        gl.glDisable(GL_DEPTH_TEST)
 
-        # If you crash before here, it’s context/functions creation, not your shader/texture code.
-
-        # --- Step 4: compile/link shaders ---
-        _dbg("[GL] step 4: build shaders ...")
         vs = """
         #version 330 core
         layout(location = 0) in vec2 aPos;
@@ -153,6 +138,7 @@ class GLColormapWidget(QOpenGLWidget):
             gl_Position = vec4(aPos, 0.0, 1.0);
         }
         """
+
         fs = """
         #version 330 core
         in vec2 vUV;
@@ -163,24 +149,18 @@ class GLColormapWidget(QOpenGLWidget):
 
         void main() {
             float v = texture(uFrame, vUV).r; // 0..1
-            float x = (v * 255.0 + 0.5) / 256.0;
+            float x = (v * 255.0 + 0.5) / 256.0; // sample center
             vec3 rgb = texture(uLUT, vec2(x, 0.5)).rgb;
             fragColor = vec4(rgb, 1.0);
         }
         """
 
         prog = QOpenGLShaderProgram()
-        _dbg("[GL] step 4.1: add vertex shader ...")
         prog.addShaderFromSourceCode(QOpenGLShader.ShaderTypeBit.Vertex, vs)
-        _dbg("[GL] step 4.2: add fragment shader ...")
         prog.addShaderFromSourceCode(QOpenGLShader.ShaderTypeBit.Fragment, fs)
-        _dbg("[GL] step 4.3: link ...")
         prog.link()
-        _dbg("[GL] step 4.4: link OK")
         self._prog = prog
 
-        # --- Step 5: VBO/VAO ---
-        _dbg("[GL] step 5: create VAO/VBO ...")
         verts = np.array(
             [
                 -1.0, -1.0, 0.0, 0.0,
@@ -205,60 +185,63 @@ class GLColormapWidget(QOpenGLWidget):
         vbo.allocate(verts.tobytes(), verts.nbytes)
         self._vbo = vbo
 
-        _dbg("[GL] step 5.1: setup attrib pointers ...")
         prog.bind()
-        stride = 4 * 4
-        gl.glEnableVertexAttribArray(0)
-        gl.glVertexAttribPointer(0, 2, gl.GL_FLOAT, False, stride, sip.voidptr(0))
-        gl.glEnableVertexAttribArray(1)
-        gl.glVertexAttribPointer(1, 2, gl.GL_FLOAT, False, stride, sip.voidptr(8))
-        prog.release()
-        _dbg("[GL] step 5.2: attrib pointers OK")
+        stride = 4 * 4  # 4 floats per vertex * 4 bytes
 
+        # IMPORTANT: offsets are byte offsets. This matches the working oglm version.
+        gl.glEnableVertexAttribArray(0)
+        gl.glVertexAttribPointer(0, 2, GL_FLOAT, False, stride, 0)
+        gl.glEnableVertexAttribArray(1)
+        gl.glVertexAttribPointer(1, 2, GL_FLOAT, False, stride, 8)
+
+        prog.release()
         vbo.release()
         vao.release()
 
-        # --- Step 6: textures ---
-        _dbg("[GL] step 6: create textures ...")
         self._tex_frame = gl.glGenTextures(1)
         self._tex_lut = gl.glGenTextures(1)
 
-        gl.glPixelStorei(gl.GL_UNPACK_ALIGNMENT, 1)
+        gl.glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
 
-        gl.glBindTexture(gl.GL_TEXTURE_2D, self._tex_frame)
-        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_NEAREST)
-        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAG_FILTER, gl.GL_NEAREST)
-        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_S, gl.GL_CLAMP_TO_EDGE)
-        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_T, gl.GL_CLAMP_TO_EDGE)
-        gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
+        # ---- frame texture params ----
+        gl.glBindTexture(GL_TEXTURE_2D, self._tex_frame)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0)
 
-        gl.glBindTexture(gl.GL_TEXTURE_2D, self._tex_lut)
-        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_NEAREST)
-        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAG_FILTER, gl.GL_NEAREST)
-        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_S, gl.GL_CLAMP_TO_EDGE)
-        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_T, gl.GL_CLAMP_TO_EDGE)
+        # Allocate something NOW so texture is never incomplete
+        if self._last_frame is not None:
+            h, w = self._last_frame.shape
+            self._frame_w, self._frame_h = w, h
+            gl.glTexImage2D(
+                GL_TEXTURE_2D, 0, GL_R8, w, h, 0, GL_RED, GL_UNSIGNED_BYTE, self._last_frame.tobytes()
+            )
+        else:
+            self._frame_w, self._frame_h = 1, 1
+            gl.glTexImage2D(
+                GL_TEXTURE_2D, 0, GL_R8, 1, 1, 0, GL_RED, GL_UNSIGNED_BYTE, bytes([0])
+            )
+        gl.glBindTexture(GL_TEXTURE_2D, 0)
 
-        default_lut = np.ascontiguousarray(
-            COLOR_MAPS.get(DEFAULT_CMAP_NAME, GRAY_LUT),
-            dtype=np.uint8,
-        )
+        # ---- LUT texture params ----
+        gl.glBindTexture(GL_TEXTURE_2D, self._tex_lut)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0)
+
         gl.glTexImage2D(
-            gl.GL_TEXTURE_2D,
-            0,
-            gl.GL_RGB8,
-            256,
-            1,
-            0,
-            gl.GL_RGB,
-            gl.GL_UNSIGNED_BYTE,
-            sip.voidptr(int(default_lut.ctypes.data)),
+            GL_TEXTURE_2D, 0, GL_RGB8, 256, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, self._last_lut.tobytes()
         )
-        gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
+        gl.glBindTexture(GL_TEXTURE_2D, 0)
 
         self._have_textures = True
         self._upload_pending()
-
-        _dbg("[GL] initializeGL: done")
 
     def resizeGL(self, w: int, h: int) -> None:
         if self._gl is None:
@@ -273,25 +256,25 @@ class GLColormapWidget(QOpenGLWidget):
         self._upload_pending()
 
         gl.glClearColor(0.0, 0.0, 0.0, 1.0)
-        gl.glClear(gl.GL_COLOR_BUFFER_BIT)
+        gl.glClear(GL_COLOR_BUFFER_BIT)
 
         self._prog.bind()
 
-        gl.glActiveTexture(gl.GL_TEXTURE0)
-        gl.glBindTexture(gl.GL_TEXTURE_2D, self._tex_frame)
+        gl.glActiveTexture(GL_TEXTURE0)
+        gl.glBindTexture(GL_TEXTURE_2D, self._tex_frame)
         self._prog.setUniformValue("uFrame", 0)
 
-        gl.glActiveTexture(gl.GL_TEXTURE1)
-        gl.glBindTexture(gl.GL_TEXTURE_2D, self._tex_lut)
+        gl.glActiveTexture(GL_TEXTURE1)
+        gl.glBindTexture(GL_TEXTURE_2D, self._tex_lut)
         self._prog.setUniformValue("uLUT", 1)
 
         self._vao.bind()
-        gl.glDrawArrays(gl.GL_TRIANGLES, 0, 6)
+        gl.glDrawArrays(GL_TRIANGLES, 0, 6)
         self._vao.release()
 
-        gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
-        gl.glActiveTexture(gl.GL_TEXTURE0)
-        gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
+        gl.glBindTexture(GL_TEXTURE_2D, 0)
+        gl.glActiveTexture(GL_TEXTURE0)
+        gl.glBindTexture(GL_TEXTURE_2D, 0)
 
         self._prog.release()
 
@@ -300,103 +283,73 @@ class GLColormapWidget(QOpenGLWidget):
             return
         gl = self._gl
 
-        gl.glPixelStorei(gl.GL_UNPACK_ALIGNMENT, 1)
+        gl.glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
 
         if self._pending_lut is not None:
             lut = self._pending_lut
             self._pending_lut = None
-            gl.glBindTexture(gl.GL_TEXTURE_2D, self._tex_lut)
+            gl.glBindTexture(GL_TEXTURE_2D, self._tex_lut)
             gl.glTexSubImage2D(
-                gl.GL_TEXTURE_2D,
-                0,
-                0,
-                0,
-                256,
-                1,
-                gl.GL_RGB,
-                gl.GL_UNSIGNED_BYTE,
-                sip.voidptr(int(lut.ctypes.data)),
+                GL_TEXTURE_2D, 0, 0, 0, 256, 1, GL_RGB, GL_UNSIGNED_BYTE, lut.tobytes()
             )
-            gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
+            gl.glBindTexture(GL_TEXTURE_2D, 0)
 
         if self._pending_frame is not None:
             pix = self._pending_frame
             self._pending_frame = None
 
             h, w = pix.shape
-            gl.glBindTexture(gl.GL_TEXTURE_2D, self._tex_frame)
+            gl.glBindTexture(GL_TEXTURE_2D, self._tex_frame)
 
             if (w != self._frame_w) or (h != self._frame_h):
                 self._frame_w = w
                 self._frame_h = h
                 gl.glTexImage2D(
-                    gl.GL_TEXTURE_2D,
-                    0,
-                    gl.GL_R8,
-                    w,
-                    h,
-                    0,
-                    gl.GL_RED,
-                    gl.GL_UNSIGNED_BYTE,
-                    sip.voidptr(int(pix.ctypes.data)),
+                    GL_TEXTURE_2D, 0, GL_R8, w, h, 0, GL_RED, GL_UNSIGNED_BYTE, pix.tobytes()
                 )
             else:
                 gl.glTexSubImage2D(
-                    gl.GL_TEXTURE_2D,
-                    0,
-                    0,
-                    0,
-                    w,
-                    h,
-                    gl.GL_RED,
-                    gl.GL_UNSIGNED_BYTE,
-                    sip.voidptr(int(pix.ctypes.data)),
+                    GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RED, GL_UNSIGNED_BYTE, pix.tobytes()
                 )
 
-            gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
+            gl.glBindTexture(GL_TEXTURE_2D, 0)
 
 
-# --------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Window: reuse base and only provide the view widget
-# --------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 class MainWindow(MainWindowBase):
     def _create_view_widget(self) -> QOpenGLWidget:
         return GLColormapWidget()
 
 
-# --------------------------------------------------------------------------
 def main() -> None:
-    # Strongly prefer Desktop OpenGL for QOpenGLWidget on Windows.
-    # Also make sure the attribute is set before creating QApplication.
-    QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseDesktopOpenGL, True)
-
-    # For debugging, start less strict than Core 3.3:
-    # If this works, you can move back to Core 3.3 later.
+    # Request a core profile context (4.1 core works on macOS, and you said this path works on Win11 too)
     fmt = QSurfaceFormat()
-    fmt.setVersion(2, 0)
-    fmt.setProfile(QSurfaceFormat.OpenGLContextProfile.NoProfile)
+    fmt.setVersion(4, 1)
+    fmt.setProfile(QSurfaceFormat.OpenGLContextProfile.CoreProfile)
     fmt.setDepthBufferSize(0)
     fmt.setStencilBufferSize(0)
     fmt.setSwapBehavior(QSurfaceFormat.SwapBehavior.DoubleBuffer)
     QSurfaceFormat.setDefaultFormat(fmt)
 
-    _dbg("[APP] Creating QApplication...")
     app = QApplication(sys.argv)
 
+    # Optional: your diagnostics
     try:
         check_cupy()
     except Exception:
         pass
 
     sim = NumPyDnsSimulator()
-
-    _dbg("[APP] Constructing MainWindow...")
     window = MainWindow(sim)
-    _dbg("[APP] MainWindow constructed")
 
-    _dbg("[APP] window.show() about to run...")
+    screen = app.primaryScreen().availableGeometry()
+    g = window.geometry()
+    g.moveCenter(screen.center())
+    window.setGeometry(g)
+
     window.show()
-
     sys.exit(app.exec())
 
 
