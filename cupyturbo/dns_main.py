@@ -265,7 +265,7 @@ COLOR_MAPS = {
     "RdBu": RDBU_LUT,
 }
 
-DEFAULT_CMAP_NAME = "Inferno"
+DEFAULT_CMAP_NAME = "Magma"
 
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtCore import Qt
