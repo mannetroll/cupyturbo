@@ -800,7 +800,7 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     def _on_timer(self) -> None:
         # one DNS step per timer tick
-        self.sim.step()
+        self.sim.step(self._update_intervall)
 
         # Count frames since the last GUI update
         self._status_update_counter += 1
