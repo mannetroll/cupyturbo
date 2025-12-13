@@ -198,6 +198,7 @@ class DnsState:
     K0: float
     visc: float             # viscosity
     cflnum: float           # CFL target
+    seed_init: int = 1
 
     # Time integration
     t: float = 0.0
@@ -246,6 +247,7 @@ def create_dns_state(
     K0: float = 100.0,
     CFL: float = 0.75,
     backend: Literal["cpu", "gpu", "auto"] = "auto",
+    seed: int = 1,
 ) -> DnsState:
     xp = get_xp(backend)
 
@@ -288,6 +290,7 @@ def create_dns_state(
         K0=K0,
         visc=visc,
         cflnum=CFL,
+        seed_init=int(seed),
     )
 
     # Allocate arrays
@@ -379,7 +382,7 @@ def dns_pao_host_init(S: DnsState):
     # ------------------------------------------------------------------
     # Fortran random vector RANVEC(97)
     # ------------------------------------------------------------------
-    seed   = [1]  # mimics ISEED SAVE
+    seed = [int(S.seed_init)]  # mimics ISEED SAVE
     RANVEC = np.zeros(97, dtype=np.float32)
 
     # "warm-up" 97 calls
@@ -528,6 +531,7 @@ def dns_pao_host_init(S: DnsState):
     print(f" Ceps2       ={Ceps2:12.4f}")
     print(f" E1          ={float(E1):12.4f}")
     print(f" E3          ={float(E3):12.4f}")
+    print(f" PAO seed    ={seed[0]:12d}")
 
     # ------------------------------------------------------------------
     # Reshuffle (Fortran DO 1000 block)

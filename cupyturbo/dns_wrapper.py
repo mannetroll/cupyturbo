@@ -1,11 +1,10 @@
 # dns_wrapper.py
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Union
 
 import numpy as np
 import math
+import os
 from cupyturbo import dns_simulator as dns_all
 from PIL import Image
 
@@ -28,12 +27,13 @@ class NumPyDnsSimulator:
     VAR_OMEGA = 3
     VAR_STREAM = 4
 
-    def __init__(self, n: int = 384, re: float = 10000.0, k0: float = 10.0,  cfl: float = 0.75):
+    def __init__(self, n: int = 384, re: float = 10000.0, k0: float = 10.0,  cfl: float = 0.75, seed: int = 1):
         self.N = int(n)
         self.m = 3 * self.N
         self.re = float(re)
         self.k0 = float(k0)
         self.cfl =  float(cfl)
+        self.seed = int(seed)
         self.max_steps = 5000
 
         # UR dimensions from Fortran workspace: UR(2+3N/2, 3N/2, 3)
@@ -47,6 +47,7 @@ class NumPyDnsSimulator:
             K0=self.k0,
             CFL=self.cfl,
             backend="auto",   # GUI uses the CPU/NumPy/GPU/CuPy backend
+            seed=self.seed,
         )
 
         self.nx = int(self.state.NZ_full)   # "height"
@@ -119,6 +120,7 @@ class NumPyDnsSimulator:
             K0=self.k0,
             CFL=self.cfl,
             backend="auto",
+            seed=self.seed,
         )
 
         # DEBUG: print full-grid sizes
@@ -159,6 +161,8 @@ class NumPyDnsSimulator:
         self.dt = np.float32(0.0)
         self.cn = np.float32(1.0)
         self.iteration = 0
+        # Pick a fresh PAO seed each reset (LCG is mod 5011 → use 1..5010)
+        seed = 1 + (int.from_bytes(os.urandom(8), "little") % 5010)
 
         # Recreate the Python DNS state and redo the NEXTDT INIT phase
         self.state = dns_all.create_dns_state(
@@ -167,6 +171,7 @@ class NumPyDnsSimulator:
             K0=self.k0,
             CFL=self.cfl,
             backend="auto",
+            seed=seed,
         )
 
         self.nx = int(self.state.NZ_full)
