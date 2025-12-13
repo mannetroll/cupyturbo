@@ -1,4 +1,4 @@
-# dns_main_uint8.py
+# dns_main.py
 import colorsys
 import os
 import sys
@@ -460,6 +460,9 @@ class MainWindow(QMainWindow):
         self.cfl_combo.currentTextChanged.connect(self.on_cfl_changed)  # type: ignore[attr-defined]
         self.steps_combo.currentTextChanged.connect(self.on_steps_changed)  # type: ignore[attr-defined]
         self.update_combo.currentTextChanged.connect(self.on_update_changed)  # type: ignore[attr-defined]
+
+        # Ensure single-key shortcuts work regardless of which widget has focus (Win11 combos eat 'C')
+        _setup_shortcuts(self)
 
         # window setup
         import importlib.util
