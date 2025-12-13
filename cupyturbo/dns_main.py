@@ -28,9 +28,6 @@ from PyQt6.QtWidgets import (
 from cupyturbo.dns_wrapper import NumPyDnsSimulator
 from cupyturbo import dns_simulator as dns_all
 
-# Update GUI only every UPDATE_INTERVAL frame
-UPDATE_INTERVAL = 40
-
 # Simple helper: build a 256x3 uint8 LUT from color stops in 0..1
 # stops: list of (pos, (r,g,b)) with pos in [0,1], r,g,b in [0,255]
 def _make_lut_from_stops(stops, size: int = 256) -> np.ndarray:
@@ -268,7 +265,7 @@ COLOR_MAPS = {
     "RdBu": RDBU_LUT,
 }
 
-DEFAULT_CMAP_NAME = "Turbo"
+DEFAULT_CMAP_NAME = "Inferno"
 
 class MainWindow(QMainWindow):
     def __init__(self, sim: NumPyDnsSimulator) -> None:
@@ -327,6 +324,7 @@ class MainWindow(QMainWindow):
 
 
         self._status_update_counter = 0
+        self._update_intervall = 2
 
         # Variable selector
         self.variable_combo = QComboBox()
@@ -348,7 +346,7 @@ class MainWindow(QMainWindow):
         # K0 selector
         self.k0_combo = QComboBox()
         self.k0_combo.setToolTip("K: Initial energy peak wavenumber (K0)")
-        self.k0_combo.addItems(["1", "5", "10", "25", "50"])
+        self.k0_combo.addItems(["1", "5", "10", "15", "25", "35", "50"])
         self.k0_combo.setCurrentText(str(int(self.sim.k0)))
 
         # Colormap selector
@@ -370,6 +368,12 @@ class MainWindow(QMainWindow):
         self.steps_combo.setToolTip("S: Max steps before reset/stop")
         self.steps_combo.addItems(["2000", "5000", "10000", "25000", "50000", "1E5", "1E6"])
         self.steps_combo.setCurrentText("5000")
+
+        # Update selector
+        self.update_combo = QComboBox()
+        self.update_combo.setToolTip("U: Update intervall")
+        self.update_combo.addItems(["1", "2", "5", "10", "20", "50"])
+        self.update_combo.setCurrentText("2")
 
         self.auto_reset_checkbox = QCheckBox()
         self.auto_reset_checkbox.setToolTip("If checked, simulation auto-resets")
@@ -395,7 +399,6 @@ class MainWindow(QMainWindow):
         # signal connections
         self.start_button.clicked.connect(self.on_start_clicked) # type: ignore[attr-defined]
         self.stop_button.clicked.connect(self.on_stop_clicked) # type: ignore[attr-defined]
-        #self.step_button.clicked.connect(self.on_step_clicked)
         self.reset_button.clicked.connect(self.on_reset_clicked) # type: ignore[attr-defined]
         self.save_button.clicked.connect(self.on_save_clicked) # type: ignore[attr-defined]
         self.folder_button.clicked.connect(self.on_folder_clicked) # type: ignore[attr-defined]
@@ -406,6 +409,7 @@ class MainWindow(QMainWindow):
         self.k0_combo.currentTextChanged.connect(self.on_k0_changed) # type: ignore[attr-defined]
         self.cfl_combo.currentTextChanged.connect(self.on_cfl_changed) # type: ignore[attr-defined]
         self.steps_combo.currentTextChanged.connect(self.on_steps_changed) # type: ignore[attr-defined]
+        self.update_combo.currentTextChanged.connect(self.on_update_changed) # type: ignore[attr-defined]
 
         # window setup
         # GPU/CPU title selection (no extra logic, just based on CuPy backend)
@@ -432,9 +436,6 @@ class MainWindow(QMainWindow):
         # initial draw (omega mode)
         self.sim.set_variable(self.sim.VAR_OMEGA)
         self.variable_combo.setCurrentIndex(3)
-
-        # (optional) a nice colormap index
-        self.cmap_combo.setCurrentIndex(6)
 
         self._update_image(self.sim.get_frame_pixels())
         self._update_status(self.sim.get_time(), self.sim.get_iteration(), None)
@@ -472,6 +473,7 @@ class MainWindow(QMainWindow):
         row1.addWidget(self.cmap_combo)
         row1.addWidget(self.steps_combo)
         row1.addWidget(self.auto_reset_checkbox)
+        row1.addWidget(self.update_combo)
 
         # Second row
         row2 = QHBoxLayout()
@@ -752,6 +754,9 @@ class MainWindow(QMainWindow):
     def on_steps_changed(self, value: str) -> None:
         self.sim.max_steps = int(float(value))
 
+    def on_update_changed(self, value: str) -> None:
+        self._update_intervall = int(float(value))
+
     # ------------------------------------------------------------------
     def _on_timer(self) -> None:
         # one DNS step per timer tick
@@ -760,7 +765,7 @@ class MainWindow(QMainWindow):
         # Count frames since the last GUI update
         self._status_update_counter += 1
 
-        if self._status_update_counter >= UPDATE_INTERVAL:
+        if self._status_update_counter >= self._update_intervall:
             pixels = self.sim.get_frame_pixels()
             self._update_image(pixels)
 
@@ -932,6 +937,13 @@ class MainWindow(QMainWindow):
             idx = self.steps_combo.currentIndex()
             count = self.steps_combo.count()
             self.steps_combo.setCurrentIndex((idx + 1) % count)
+            return
+
+        # update intervall (S)
+        if key == Qt.Key.Key_U:
+            idx = self.update_combo.currentIndex()
+            count = self.update_combo.count()
+            self.update_combo.setCurrentIndex((idx + 1) % count)
             return
 
         super().keyPressEvent(event)
