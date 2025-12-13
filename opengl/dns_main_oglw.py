@@ -315,6 +315,16 @@ class GLColormapWidget(QOpenGLWidget):
             gl.glBindTexture(GL_TEXTURE_2D, 0)
 
 
+def dbg_cuda_mem() -> None:
+    try:
+        import cupy as cp
+        free_b, total_b = cp.cuda.runtime.memGetInfo()
+        used = total_b - free_b
+        print(f"[CUDA] mem used: {used/1024**2:.1f} MiB  free: {free_b/1024**2:.1f} MiB", flush=True)
+    except Exception as e:
+        print(f"[CUDA] not available: {e!r}", flush=True)
+
+
 # -----------------------------------------------------------------------------
 # Window: reuse base and only provide the view widget
 # -----------------------------------------------------------------------------
@@ -341,7 +351,7 @@ def main() -> None:
     except Exception:
         pass
 
-    sim = NumPyDnsSimulator()
+    sim = NumPyDnsSimulator(n=1024)
     window = MainWindow(sim)
 
     screen = app.primaryScreen().availableGeometry()
@@ -350,6 +360,8 @@ def main() -> None:
     window.setGeometry(g)
 
     window.show()
+    print("backend:", sim.state.backend)
+    dbg_cuda_mem()
     sys.exit(app.exec())
 
 
