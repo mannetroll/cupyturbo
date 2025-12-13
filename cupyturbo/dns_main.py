@@ -267,6 +267,41 @@ COLOR_MAPS = {
 
 DEFAULT_CMAP_NAME = "Inferno"
 
+from PyQt6.QtGui import QKeySequence, QShortcut
+from PyQt6.QtCore import Qt
+
+def _setup_shortcuts(self):
+    def sc(key, fn):
+        s = QShortcut(QKeySequence(key), self)
+        s.setContext(Qt.ShortcutContext.ApplicationShortcut)
+        s.activated.connect(fn)
+        return s
+
+    self._sc_v = sc("V", lambda: self.variable_combo.setCurrentIndex(
+        (self.variable_combo.currentIndex() + 1) % self.variable_combo.count()
+    ))
+    self._sc_c = sc("C", lambda: self.cmap_combo.setCurrentIndex(
+        (self.cmap_combo.currentIndex() + 1) % self.cmap_combo.count()
+    ))
+    self._sc_n = sc("N", lambda: self.n_combo.setCurrentIndex(
+        (self.n_combo.currentIndex() + 1) % self.n_combo.count()
+    ))
+    self._sc_r = sc("R", lambda: self.re_combo.setCurrentIndex(
+        (self.re_combo.currentIndex() + 1) % self.re_combo.count()
+    ))
+    self._sc_k = sc("K", lambda: self.k0_combo.setCurrentIndex(
+        (self.k0_combo.currentIndex() + 1) % self.k0_combo.count()
+    ))
+    self._sc_l = sc("L", lambda: self.cfl_combo.setCurrentIndex(
+        (self.cfl_combo.currentIndex() + 1) % self.cfl_combo.count()
+    ))
+    self._sc_s = sc("S", lambda: self.steps_combo.setCurrentIndex(
+        (self.steps_combo.currentIndex() + 1) % self.steps_combo.count()
+    ))
+    self._sc_u = sc("U", lambda: self.update_combo.setCurrentIndex(
+        (self.update_combo.currentIndex() + 1) % self.update_combo.count()
+    ))
+
 class MainWindow(QMainWindow):
     def __init__(self, sim: NumPyDnsSimulator) -> None:
         super().__init__()
@@ -938,7 +973,7 @@ class MainWindow(QMainWindow):
             self.steps_combo.setCurrentIndex((idx + 1) % count)
             return
 
-        # update intervall (S)
+        # update intervall (U)
         if key == Qt.Key.Key_U:
             idx = self.update_combo.currentIndex()
             count = self.update_combo.count()
