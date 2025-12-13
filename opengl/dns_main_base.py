@@ -366,7 +366,7 @@ class MainWindowBase(QMainWindow):
         self.update_combo = QComboBox()
         self.update_combo.setToolTip("U: Update intervall")
         self.update_combo.addItems(["2", "5", "10", "50", "100", "1000"])
-        self.update_combo.setCurrentText("2")
+        self.update_combo.setCurrentText("10")
 
         self.auto_reset_checkbox = QCheckBox()
         self.auto_reset_checkbox.setToolTip("If checked, simulation auto-resets")
