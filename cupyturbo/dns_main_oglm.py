@@ -59,6 +59,9 @@ GL_TEXTURE_MAG_FILTER = 0x2800
 GL_TEXTURE_WRAP_S = 0x2802
 GL_TEXTURE_WRAP_T = 0x2803
 
+GL_TEXTURE_BASE_LEVEL = 0x813C
+GL_TEXTURE_MAX_LEVEL = 0x813D
+
 GL_R8 = 0x8229
 GL_RGB8 = 0x8051
 GL_RED = 0x1903
@@ -326,11 +329,19 @@ class GLColormapWidget(QOpenGLWidget):
         self._pending_lut: Optional[np.ndarray] = None    # 256x3 uint8
         self._have_textures: bool = False
 
+        # --- CRITICAL: keep last valid data so context recreates don't go black
+        self._last_frame: Optional[np.ndarray] = None      # HxW uint8
+        self._last_lut: np.ndarray = np.ascontiguousarray(
+            COLOR_MAPS.get(DEFAULT_CMAP_NAME, GRAY_LUT), dtype=np.uint8
+        )
+
     def set_frame(self, pixels_u8: np.ndarray) -> None:
         pix = np.asarray(pixels_u8, dtype=np.uint8)
         if pix.ndim != 2:
             return
-        self._pending_frame = np.ascontiguousarray(pix)
+        pix_c = np.ascontiguousarray(pix)
+        self._last_frame = pix_c
+        self._pending_frame = pix_c
         if self._have_textures:
             self.makeCurrent()
             self._upload_pending()
@@ -341,7 +352,9 @@ class GLColormapWidget(QOpenGLWidget):
         lut = np.asarray(lut_rgb, dtype=np.uint8)
         if lut.shape != (256, 3):
             return
-        self._pending_lut = np.ascontiguousarray(lut)
+        lut_c = np.ascontiguousarray(lut)
+        self._last_lut = lut_c
+        self._pending_lut = lut_c
         if self._have_textures:
             self.makeCurrent()
             self._upload_pending()
@@ -425,30 +438,40 @@ class GLColormapWidget(QOpenGLWidget):
 
         gl.glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
 
+        # ---- frame texture params ----
         gl.glBindTexture(GL_TEXTURE_2D, self._tex_frame)
         gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
         gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
         gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
         gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0)
+
+        # IMPORTANT: allocate something NOW so texture is never incomplete
+        if self._last_frame is not None:
+            h, w = self._last_frame.shape
+            self._frame_w, self._frame_h = w, h
+            gl.glTexImage2D(
+                GL_TEXTURE_2D, 0, GL_R8, w, h, 0, GL_RED, GL_UNSIGNED_BYTE, self._last_frame.tobytes()
+            )
+        else:
+            self._frame_w, self._frame_h = 1, 1
+            gl.glTexImage2D(
+                GL_TEXTURE_2D, 0, GL_R8, 1, 1, 0, GL_RED, GL_UNSIGNED_BYTE, bytes([0])
+            )
         gl.glBindTexture(GL_TEXTURE_2D, 0)
 
+        # ---- LUT texture params ----
         gl.glBindTexture(GL_TEXTURE_2D, self._tex_lut)
         gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
         gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
         gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
         gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0)
 
-        default_lut = np.ascontiguousarray(COLOR_MAPS.get(DEFAULT_CMAP_NAME, GRAY_LUT), dtype=np.uint8)
         gl.glTexImage2D(
-            GL_TEXTURE_2D,
-            0,
-            GL_RGB8,
-            256,
-            1,
-            0,
-            GL_RGB,
-            GL_UNSIGNED_BYTE,
-            default_lut.tobytes(),
+            GL_TEXTURE_2D, 0, GL_RGB8, 256, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, self._last_lut.tobytes()
         )
         gl.glBindTexture(GL_TEXTURE_2D, 0)
 
@@ -502,15 +525,7 @@ class GLColormapWidget(QOpenGLWidget):
             self._pending_lut = None
             gl.glBindTexture(GL_TEXTURE_2D, self._tex_lut)
             gl.glTexSubImage2D(
-                GL_TEXTURE_2D,
-                0,
-                0,
-                0,
-                256,
-                1,
-                GL_RGB,
-                GL_UNSIGNED_BYTE,
-                lut.tobytes(),
+                GL_TEXTURE_2D, 0, 0, 0, 256, 1, GL_RGB, GL_UNSIGNED_BYTE, lut.tobytes()
             )
             gl.glBindTexture(GL_TEXTURE_2D, 0)
 
@@ -525,27 +540,11 @@ class GLColormapWidget(QOpenGLWidget):
                 self._frame_w = w
                 self._frame_h = h
                 gl.glTexImage2D(
-                    GL_TEXTURE_2D,
-                    0,
-                    GL_R8,
-                    w,
-                    h,
-                    0,
-                    GL_RED,
-                    GL_UNSIGNED_BYTE,
-                    pix.tobytes(),
+                    GL_TEXTURE_2D, 0, GL_R8, w, h, 0, GL_RED, GL_UNSIGNED_BYTE, pix.tobytes()
                 )
             else:
                 gl.glTexSubImage2D(
-                    GL_TEXTURE_2D,
-                    0,
-                    0,
-                    0,
-                    w,
-                    h,
-                    GL_RED,
-                    GL_UNSIGNED_BYTE,
-                    pix.tobytes(),
+                    GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RED, GL_UNSIGNED_BYTE, pix.tobytes()
                 )
 
             gl.glBindTexture(GL_TEXTURE_2D, 0)
@@ -711,6 +710,8 @@ class MainWindow(QMainWindow):
     def _build_layout(self):
         old = self.centralWidget()
         if old is not None:
+            # IMPORTANT: prevent gl_view from being deleted with the old central widget
+            self.gl_view.setParent(None)
             old.setParent(None)
 
         central = QWidget()
@@ -897,6 +898,7 @@ class MainWindow(QMainWindow):
         dw, dh = self._display_size_for_N(N)
         self.gl_view.setFixedSize(dw, dh)
 
+        # update image BEFORE potential layout rebuild (so GL widget has last frame)
         self._update_image(self.sim.get_frame_pixels())
 
         new_w = dw + 40
@@ -913,6 +915,7 @@ class MainWindow(QMainWindow):
         self.setGeometry(g)
 
         self._build_layout()
+
         self._sim_start_time = time.time()
         self._sim_start_iter = self.sim.get_iteration()
 
@@ -1028,7 +1031,7 @@ def main() -> None:
     QSurfaceFormat.setDefaultFormat(fmt)
 
     app = QApplication(sys.argv)
-    sim = NumPyDnsSimulator()
+    sim = NumPyDnsSimulator(n=512)
     window = MainWindow(sim)
 
     screen = app.primaryScreen().availableGeometry()
