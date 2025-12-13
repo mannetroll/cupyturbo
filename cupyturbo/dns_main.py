@@ -1,13 +1,12 @@
-# dns_main.py
+# dns_main_uint8.py
 import colorsys
 import os
 import sys
 import time
 from typing import Optional
 
-from PyQt6.QtCore import QSize, QTimer
-from PyQt6.QtCore import QStandardPaths
-from PyQt6.QtGui import QImage, QPixmap, QFontDatabase
+from PyQt6.QtCore import QSize, QTimer, Qt, QStandardPaths
+from PyQt6.QtGui import QImage, QPixmap, QFontDatabase, qRgb, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -276,8 +275,14 @@ COLOR_MAPS = {
 
 DEFAULT_CMAP_NAME = "Magma"
 
-from PyQt6.QtGui import QKeySequence, QShortcut
-from PyQt6.QtCore import Qt
+# ----------------------------------------------------------------------
+# Option A: Qt Indexed8 + palette tables (avoid expanding to RGB in NumPy)
+# ----------------------------------------------------------------------
+QT_COLOR_TABLES = {
+    name: [qRgb(int(rgb[0]), int(rgb[1]), int(rgb[2])) for rgb in lut]
+    for name, lut in COLOR_MAPS.items()
+}
+QT_GRAY_TABLE = [qRgb(i, i, i) for i in range(256)]
 
 
 def _setup_shortcuts(self):
@@ -457,9 +462,6 @@ class MainWindow(QMainWindow):
         self.update_combo.currentTextChanged.connect(self.on_update_changed)  # type: ignore[attr-defined]
 
         # window setup
-        # GPU/CPU title selection (no extra logic, just based on CuPy backend)
-        # GPU/CPU title selection
-        # title_backend = "CuPy" if self.sim.state.backend == "gpu" else "NumPy"
         import importlib.util
 
         title_backend = "(NumPy)"
@@ -475,7 +477,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"2D Turbulence {title_backend} © Mannetroll")
         self.resize(self.sim.px + 40, self.sim.py + 120)
 
-        self._last_pixels_rgb: Optional[np.ndarray] = None
+        # Keep-alive buffers for QImage wrappers
+        self._last_pixels_rgb: Optional[np.ndarray] = None  # retained for compatibility
+        self._last_pixels_u8: Optional[np.ndarray] = None
 
         # --- FPS from simulation start ---
         self._sim_start_time = time.time()
@@ -543,13 +547,13 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(central)
 
-    def _maybe_downscale(self, rgb: np.ndarray) -> np.ndarray:
+    def _maybe_downscale_u8(self, pix: np.ndarray) -> np.ndarray:
         """
-        Downscale full-resolution RGB (H×W×3) by factor:
+        Downscale a 2D uint8 image for display only.
+        Uses striding (nearest) to be very fast and avoid float work.
         """
         N = self.sim.N
 
-        # Determine scale factor
         if N < 768:
             scale = 1
         elif N <= 1024:
@@ -560,19 +564,9 @@ class MainWindow(QMainWindow):
             scale = 6
 
         if scale == 1:
-            return rgb
+            return np.ascontiguousarray(pix)
 
-        # --- Downscale by averaging blocks ---
-        h, w, _ = rgb.shape
-        h2 = h // scale
-        w2 = w // scale
-
-        # Ensure reshape fits
-        rgb = rgb[:h2 * scale, :w2 * scale]
-
-        # Reshape to (h2, scale, w2, scale, 3) and average
-        small = rgb.reshape(h2, scale, w2, scale, 3).mean(axis=(1, 3))
-        return small.astype(np.uint8)
+        return np.ascontiguousarray(pix[::scale, ::scale])
 
     def _get_full_field(self, variable: str) -> np.ndarray:
         """
@@ -640,8 +634,6 @@ class MainWindow(QMainWindow):
         self._update_image(pixels)
         t = self.sim.get_time()
         it = self.sim.get_iteration()
-        # one manual step doesn't really change the global FPS much,
-        # so we leave fps=None here
         self._update_status(t, it, fps=None)
 
     def on_reset_clicked(self) -> None:
@@ -749,7 +741,6 @@ class MainWindow(QMainWindow):
         self._update_image(self.sim.get_frame_pixels())
 
         # 2) Compute new geometry
-        # compute new window size based on the downscaled image
         new_w = self.image_label.pixmap().width() + 40
         new_h = self.image_label.pixmap().height() + 120
         print("Resize to:", new_w, new_h)
@@ -791,7 +782,6 @@ class MainWindow(QMainWindow):
         self._update_image(self.sim.get_frame_pixels())
 
     def on_cfl_changed(self, value: str) -> None:
-        # update simulator CFL
         self.sim.cfl = float(value)
         self.sim.reset_field()
         self._sim_start_time = time.time()
@@ -835,12 +825,10 @@ class MainWindow(QMainWindow):
         # Optional auto-reset using STEPS combo
         if self.sim.get_iteration() >= self.sim.max_steps:
             if self.auto_reset_checkbox.isChecked():
-                # Auto-reset ON → behave as before
                 self.sim.reset_field()
                 self._sim_start_time = time.time()
                 self._sim_start_iter = self.sim.get_iteration()
             else:
-                # Auto-reset OFF → stop simulation
                 self.timer.stop()
                 print("Max steps reached — simulation stopped (Auto-Reset OFF).")
 
@@ -870,43 +858,32 @@ class MainWindow(QMainWindow):
 
     def _update_image(self, pixels: np.ndarray) -> None:
         """
-        Map H×W uint8 pixels through colormap and show in the label.
+        Display H×W uint8 pixels using Qt Indexed8 + color table.
+        Avoids expanding to H×W×3 RGB in NumPy.
         """
         pixels = np.asarray(pixels, dtype=np.uint8)
         if pixels.ndim != 2:
             return
 
-        lut = COLOR_MAPS.get(self.current_cmap_name)
-        if lut is None:
-            # fallback: grayscale
-            h, w = pixels.shape
-            qimg = QImage(
-                pixels.data,
-                w,
-                h,
-                w,
-                QImage.Format.Format_Grayscale8,
-            )
-        else:
-            lut_arr = np.asarray(lut, dtype=np.uint8)
-            rgb = lut_arr[pixels]  # H×W×3
+        pixels = self._maybe_downscale_u8(pixels)
+        h, w = pixels.shape
 
-            # Downscale if N = 768 or 1024
-            rgb = self._maybe_downscale(rgb)
+        # Keep numpy buffer alive for QImage
+        self._last_pixels_u8 = pixels
 
-            h, w, _ = rgb.shape
-            self._last_pixels_rgb = rgb  # keep alive
-            qimg = QImage(
-                rgb.data,
-                w,
-                h,
-                3 * w,
-                QImage.Format.Format_RGB888,
-            )
+        qimg = QImage(
+            pixels.data,
+            w,
+            h,
+            w,  # bytesPerLine: 1 byte per pixel
+            QImage.Format.Format_Indexed8,
+        )
 
-        pix = QPixmap.fromImage(qimg)
+        table = QT_COLOR_TABLES.get(self.current_cmap_name, QT_GRAY_TABLE)
+        qimg.setColorTable(table)
+
+        pix = QPixmap.fromImage(qimg, Qt.ImageConversionFlag.NoFormatConversion)
         self.image_label.setPixmap(pix)
-        # self.image_label.adjustSize()
 
     def _update_status(self, t: float, it: int, fps: Optional[float]) -> None:
         fps_str = f"{fps:4.1f}" if fps is not None else " N/a"
