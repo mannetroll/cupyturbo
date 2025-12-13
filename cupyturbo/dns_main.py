@@ -1,9 +1,8 @@
 # dns_main.py
-import time
-import sys
-import os
 import colorsys
-import numpy as np
+import os
+import sys
+import time
 from typing import Optional
 
 from PyQt6.QtCore import QSize, QTimer
@@ -24,9 +23,11 @@ from PyQt6.QtWidgets import (
     QStyle,
     QLineEdit,
 )
+import numpy as np
 
-from cupyturbo.dns_wrapper import NumPyDnsSimulator
 from cupyturbo import dns_simulator as dns_all
+from cupyturbo.dns_wrapper import NumPyDnsSimulator
+
 
 # Simple helper: build a 256x3 uint8 LUT from color stops in 0..1
 # stops: list of (pos, (r,g,b)) with pos in [0,1], r,g,b in [0,255]
@@ -83,40 +84,40 @@ def _make_fire_lut() -> np.ndarray:
 def _make_doom_fire_lut() -> np.ndarray:
     """Classic Doom fire palette approximated as 256 RGB colors."""
     key_colors = np.array([
-        [  0,   0,   0],
-        [  7,   7,   7],
-        [ 31,   7,   7],
-        [ 47,  15,   7],
-        [ 71,  15,   7],
-        [ 87,  23,   7],
-        [103,  31,   7],
-        [119,  31,   7],
-        [143,  39,   7],
-        [159,  47,   7],
-        [175,  63,   7],
-        [191,  71,   7],
-        [199,  71,   7],
-        [223,  79,   7],
-        [223,  87,   7],
-        [223,  87,   7],
-        [215,  95,   7],
-        [215,  95,   7],
-        [215, 103,  15],
-        [207, 111,  15],
-        [207, 119,  15],
-        [207, 127,  15],
-        [207, 135,  23],
-        [199, 135,  23],
-        [199, 143,  23],
-        [199, 151,  31],
-        [191, 159,  31],
-        [191, 159,  31],
-        [191, 167,  39],
-        [191, 167,  39],
-        [191, 175,  47],
-        [183, 175,  47],
-        [183, 183,  47],
-        [183, 183,  55],
+        [0, 0, 0],
+        [7, 7, 7],
+        [31, 7, 7],
+        [47, 15, 7],
+        [71, 15, 7],
+        [87, 23, 7],
+        [103, 31, 7],
+        [119, 31, 7],
+        [143, 39, 7],
+        [159, 47, 7],
+        [175, 63, 7],
+        [191, 71, 7],
+        [199, 71, 7],
+        [223, 79, 7],
+        [223, 87, 7],
+        [223, 87, 7],
+        [215, 95, 7],
+        [215, 95, 7],
+        [215, 103, 15],
+        [207, 111, 15],
+        [207, 119, 15],
+        [207, 127, 15],
+        [207, 135, 23],
+        [199, 135, 23],
+        [199, 143, 23],
+        [199, 151, 31],
+        [191, 159, 31],
+        [191, 159, 31],
+        [191, 167, 39],
+        [191, 167, 39],
+        [191, 175, 47],
+        [183, 175, 47],
+        [183, 183, 47],
+        [183, 183, 55],
         [207, 207, 111],
         [223, 223, 159],
         [239, 239, 199],
@@ -134,92 +135,99 @@ def _make_doom_fire_lut() -> np.ndarray:
 def _make_viridis_lut() -> np.ndarray:
     # Approximate viridis with a few key colors from the official palette
     stops = [
-        (0.0,  (68,  1, 84)),
-        (0.25, (59, 82,139)),
-        (0.50, (33,145,140)),
-        (0.75, (94,201, 98)),
-        (1.0,  (253,231, 37)),
+        (0.0, (68, 1, 84)),
+        (0.25, (59, 82, 139)),
+        (0.50, (33, 145, 140)),
+        (0.75, (94, 201, 98)),
+        (1.0, (253, 231, 37)),
     ]
     return _make_lut_from_stops(stops)
 
 
 def _make_inferno_lut() -> np.ndarray:
     stops = [
-        (0.0,  (  0,   0,   4)),
-        (0.25, ( 87,  15, 109)),
-        (0.50, (187,  55,  84)),
-        (0.75, (249, 142,   8)),
-        (1.0,  (252, 255, 164)),
+        (0.0, (0, 0, 4)),
+        (0.25, (87, 15, 109)),
+        (0.50, (187, 55, 84)),
+        (0.75, (249, 142, 8)),
+        (1.0, (252, 255, 164)),
     ]
     return _make_lut_from_stops(stops)
+
 
 def _make_ocean_lut() -> np.ndarray:
     # Ocean: deep-blue → blue → cyan → turquoise → pale-aqua
     stops = [
-        (0.0,  (  0,   5,  30)),   # deep navy
-        (0.25, (  0,  60, 125)),   # rich ocean blue
-        (0.50, (  0, 140, 190)),   # cyan-blue mix
-        (0.75, (  0, 200, 175)),   # turquoise
-        (1.0,  (180, 245, 240)),   # pale aqua
+        (0.0, (0, 5, 30)),  # deep navy
+        (0.25, (0, 60, 125)),  # rich ocean blue
+        (0.50, (0, 140, 190)),  # cyan-blue mix
+        (0.75, (0, 200, 175)),  # turquoise
+        (1.0, (180, 245, 240)),  # pale aqua
     ]
     return _make_lut_from_stops(stops)
+
 
 def _make_cividis_lut() -> np.ndarray:
     stops = [
-        (0.00, (  0,  34,  77)),
-        (0.25, (  0,  68, 117)),
-        (0.50, (  60, 111, 130)),
-        (0.75, (147, 147,  95)),
-        (1.00, (250, 231,  33)),
+        (0.00, (0, 34, 77)),
+        (0.25, (0, 68, 117)),
+        (0.50, (60, 111, 130)),
+        (0.75, (147, 147, 95)),
+        (1.00, (250, 231, 33)),
     ]
     return _make_lut_from_stops(stops)
+
 
 def _make_jet_lut() -> np.ndarray:
     stops = [
-        (0.00, (  0,   0, 131)),  # dark blue
-        (0.35, (  0, 255, 255)),  # cyan
-        (0.66, (255, 255,   0)),  # yellow
-        (1.00, (128,   0,   0)),  # dark red
+        (0.00, (0, 0, 131)),  # dark blue
+        (0.35, (0, 255, 255)),  # cyan
+        (0.66, (255, 255, 0)),  # yellow
+        (1.00, (128, 0, 0)),  # dark red
     ]
     return _make_lut_from_stops(stops)
+
 
 def _make_coolwarm_lut() -> np.ndarray:
     stops = [
-        (0.00, ( 59,  76, 192)),  # deep blue
+        (0.00, (59, 76, 192)),  # deep blue
         (0.25, (127, 150, 203)),
         (0.50, (217, 217, 217)),  # near white (center)
         (0.75, (203, 132, 123)),
-        (1.00, (180,   4,  38)),  # deep red
-    ]
-    return _make_lut_from_stops(stops)
-def _make_rdbu_lut() -> np.ndarray:
-    stops = [
-        (0.00, (103,   0,  31)),  # dark red
-        (0.25, (178,  24,  43)),
-        (0.50, (247, 247, 247)),  # white center
-        (0.75, ( 33, 102, 172)),
-        (1.00, (  5,  48,  97)),  # dark blue
+        (1.00, (180, 4, 38)),  # deep red
     ]
     return _make_lut_from_stops(stops)
 
+
+def _make_rdbu_lut() -> np.ndarray:
+    stops = [
+        (0.00, (103, 0, 31)),  # dark red
+        (0.25, (178, 24, 43)),
+        (0.50, (247, 247, 247)),  # white center
+        (0.75, (33, 102, 172)),
+        (1.00, (5, 48, 97)),  # dark blue
+    ]
+    return _make_lut_from_stops(stops)
+
+
 def _make_plasma_lut() -> np.ndarray:
     stops = [
-        (0.0,  ( 13,   8, 135)),
-        (0.25, (126,   3, 167)),
-        (0.50, (203,  71, 119)),
-        (0.75, (248, 149,  64)),
-        (1.0,  (240, 249,  33)),
+        (0.0, (13, 8, 135)),
+        (0.25, (126, 3, 167)),
+        (0.50, (203, 71, 119)),
+        (0.75, (248, 149, 64)),
+        (1.0, (240, 249, 33)),
     ]
     return _make_lut_from_stops(stops)
 
 
 def _make_magma_lut() -> np.ndarray:
     stops = [
-        (0.0,  (  0,   0,   4)),
-        (0.25, ( 73,  18,  99)),
-        (0.50, (150,  50,  98)),
-        (0.75, (226, 102,  73)),
-        (1.0,  (252, 253, 191)),
+        (0.0, (0, 0, 4)),
+        (0.25, (73, 18, 99)),
+        (0.50, (150, 50, 98)),
+        (0.75, (226, 102, 73)),
+        (1.0, (252, 253, 191)),
     ]
     return _make_lut_from_stops(stops)
 
@@ -227,27 +235,28 @@ def _make_magma_lut() -> np.ndarray:
 def _make_turbo_lut() -> np.ndarray:
     # Approximate Google's Turbo colormap with a few key stops.
     stops = [
-        (0.0,  ( 48,  18,  59)),
-        (0.25, ( 31, 120, 180)),
-        (0.50, ( 78, 181,  75)),
-        (0.75, (241, 208,  29)),
-        (1.0,  (133,  32,  26)),
+        (0.0, (48, 18, 59)),
+        (0.25, (31, 120, 180)),
+        (0.50, (78, 181, 75)),
+        (0.75, (241, 208, 29)),
+        (1.0, (133, 32, 26)),
     ]
     return _make_lut_from_stops(stops)
 
-GRAY_LUT       = _make_gray_lut()
-INFERNO_LUT    = _make_inferno_lut()
-OCEAN_LUT      = _make_ocean_lut()
-VIRIDIS_LUT    = _make_viridis_lut()
-PLASMA_LUT     = _make_plasma_lut()
-MAGMA_LUT      = _make_magma_lut()
-TURBO_LUT      = _make_turbo_lut()
-FIRE_LUT       = _make_fire_lut()
-DOOM_FIRE_LUT  = _make_doom_fire_lut()
-CIVIDIS_LUT    = _make_cividis_lut()
-JET_LUT        = _make_jet_lut()
-COOLWARM_LUT   = _make_coolwarm_lut()
-RDBU_LUT       = _make_rdbu_lut()
+
+GRAY_LUT = _make_gray_lut()
+INFERNO_LUT = _make_inferno_lut()
+OCEAN_LUT = _make_ocean_lut()
+VIRIDIS_LUT = _make_viridis_lut()
+PLASMA_LUT = _make_plasma_lut()
+MAGMA_LUT = _make_magma_lut()
+TURBO_LUT = _make_turbo_lut()
+FIRE_LUT = _make_fire_lut()
+DOOM_FIRE_LUT = _make_doom_fire_lut()
+CIVIDIS_LUT = _make_cividis_lut()
+JET_LUT = _make_jet_lut()
+COOLWARM_LUT = _make_coolwarm_lut()
+RDBU_LUT = _make_rdbu_lut()
 
 COLOR_MAPS = {
     "Gray": GRAY_LUT,
@@ -270,11 +279,12 @@ DEFAULT_CMAP_NAME = "Magma"
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtCore import Qt
 
+
 def _setup_shortcuts(self):
     def sc(key, fn):
         s = QShortcut(QKeySequence(key), self)
         s.setContext(Qt.ShortcutContext.ApplicationShortcut)
-        s.activated.connect(fn) # type: ignore[attr-defined]
+        s.activated.connect(fn)  # type: ignore[attr-defined]
         return s
 
     self._sc_v = sc("V", lambda: self.variable_combo.setCurrentIndex(
@@ -301,6 +311,7 @@ def _setup_shortcuts(self):
     self._sc_u = sc("U", lambda: self.update_combo.setCurrentIndex(
         (self.update_combo.currentIndex() + 1) % self.update_combo.count()
     ))
+
 
 class MainWindow(QMainWindow):
     def __init__(self, sim: NumPyDnsSimulator) -> None:
@@ -356,7 +367,6 @@ class MainWindow(QMainWindow):
         self.folder_button.setToolTip("Save files")
         self.folder_button.setFixedSize(28, 28)
         self.folder_button.setIconSize(QSize(14, 14))
-
 
         self._status_update_counter = 0
         self._update_intervall = 2
@@ -428,23 +438,23 @@ class MainWindow(QMainWindow):
 
         # Timer-based simulation (no QThread)
         self.timer = QTimer(self)
-        self.timer.setInterval(0)   # as fast as Qt allows
-        self.timer.timeout.connect(self._on_timer) # type: ignore[attr-defined]
+        self.timer.setInterval(0)  # as fast as Qt allows
+        self.timer.timeout.connect(self._on_timer)  # type: ignore[attr-defined]
 
         # signal connections
-        self.start_button.clicked.connect(self.on_start_clicked) # type: ignore[attr-defined]
-        self.stop_button.clicked.connect(self.on_stop_clicked) # type: ignore[attr-defined]
-        self.reset_button.clicked.connect(self.on_reset_clicked) # type: ignore[attr-defined]
-        self.save_button.clicked.connect(self.on_save_clicked) # type: ignore[attr-defined]
-        self.folder_button.clicked.connect(self.on_folder_clicked) # type: ignore[attr-defined]
-        self.variable_combo.currentIndexChanged.connect(self.on_variable_changed) # type: ignore[attr-defined]
-        self.cmap_combo.currentTextChanged.connect(self.on_cmap_changed) # type: ignore[attr-defined]
-        self.n_combo.currentTextChanged.connect(self.on_n_changed) # type: ignore[attr-defined]
-        self.re_combo.currentTextChanged.connect(self.on_re_changed) # type: ignore[attr-defined]
-        self.k0_combo.currentTextChanged.connect(self.on_k0_changed) # type: ignore[attr-defined]
-        self.cfl_combo.currentTextChanged.connect(self.on_cfl_changed) # type: ignore[attr-defined]
-        self.steps_combo.currentTextChanged.connect(self.on_steps_changed) # type: ignore[attr-defined]
-        self.update_combo.currentTextChanged.connect(self.on_update_changed) # type: ignore[attr-defined]
+        self.start_button.clicked.connect(self.on_start_clicked)  # type: ignore[attr-defined]
+        self.stop_button.clicked.connect(self.on_stop_clicked)  # type: ignore[attr-defined]
+        self.reset_button.clicked.connect(self.on_reset_clicked)  # type: ignore[attr-defined]
+        self.save_button.clicked.connect(self.on_save_clicked)  # type: ignore[attr-defined]
+        self.folder_button.clicked.connect(self.on_folder_clicked)  # type: ignore[attr-defined]
+        self.variable_combo.currentIndexChanged.connect(self.on_variable_changed)  # type: ignore[attr-defined]
+        self.cmap_combo.currentTextChanged.connect(self.on_cmap_changed)  # type: ignore[attr-defined]
+        self.n_combo.currentTextChanged.connect(self.on_n_changed)  # type: ignore[attr-defined]
+        self.re_combo.currentTextChanged.connect(self.on_re_changed)  # type: ignore[attr-defined]
+        self.k0_combo.currentTextChanged.connect(self.on_k0_changed)  # type: ignore[attr-defined]
+        self.cfl_combo.currentTextChanged.connect(self.on_cfl_changed)  # type: ignore[attr-defined]
+        self.steps_combo.currentTextChanged.connect(self.on_steps_changed)  # type: ignore[attr-defined]
+        self.update_combo.currentTextChanged.connect(self.on_update_changed)  # type: ignore[attr-defined]
 
         # window setup
         # GPU/CPU title selection (no extra logic, just based on CuPy backend)
@@ -672,7 +682,7 @@ class MainWindow(QMainWindow):
 
         # Prefill the directory edit field
         for lineedit in dlg.findChildren(QLineEdit):
-            lineedit.setText(".") # type: ignore[attr-defined]
+            lineedit.setText(".")  # type: ignore[attr-defined]
 
         # Execute dialog
         if dlg.exec():
@@ -788,7 +798,6 @@ class MainWindow(QMainWindow):
         self._sim_start_iter = self.sim.get_iteration()
         self._update_image(self.sim.get_frame_pixels())
 
-
     def on_steps_changed(self, value: str) -> None:
         self.sim.max_steps = int(float(value))
 
@@ -897,7 +906,7 @@ class MainWindow(QMainWindow):
 
         pix = QPixmap.fromImage(qimg)
         self.image_label.setPixmap(pix)
-        #self.image_label.adjustSize()
+        # self.image_label.adjustSize()
 
     def _update_status(self, t: float, it: int, fps: Optional[float]) -> None:
         fps_str = f"{fps:4.1f}" if fps is not None else " N/a"
@@ -985,6 +994,7 @@ class MainWindow(QMainWindow):
 
         super().keyPressEvent(event)
 
+
 # ----------------------------------------------------------------------
 def main() -> None:
     app = QApplication(sys.argv)
@@ -996,6 +1006,7 @@ def main() -> None:
     window.setGeometry(g)
     window.show()
     sys.exit(app.exec())
+
 
 if __name__ == "__main__":
     main()
