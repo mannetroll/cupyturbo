@@ -902,12 +902,15 @@ class MainWindow(QMainWindow):
         else:
             dpp = 17  # 6× downscale (≈16.7%)
 
+        # elapsed wall time since sim start (minutes)
+        elapsed_min = (time.time() - self._sim_start_time) / 60.0
+
         # Viscosity from DNS state
         visc = float(self.sim.state.visc)
 
         txt = (
             f"FPS: {fps_str} | Iter: {it:5d} | T: {t:6.3f} "
-            f"| DPP: {dpp}% | Visc: {visc:12.10f}"
+            f"| DPP: {dpp}% | {elapsed_min:4.1f} min | Visc: {visc:12.10f}"
         )
 
         self.status.showMessage(txt)
