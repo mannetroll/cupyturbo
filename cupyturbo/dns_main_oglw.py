@@ -1,27 +1,21 @@
 # dns_main_oglw.py
 # (Option C: QOpenGLWidget + textures + LUT shader) — Win11Pro version
 import colorsys
+import ctypes
 import os
 import sys
 import time
 from typing import Any, Optional, Tuple
 
 import numpy as np
+
 from PyQt6.QtCore import QSize, QTimer, Qt, QStandardPaths
 from PyQt6.QtGui import (
     QFontDatabase,
+    QKeySequence,
+    QShortcut,
     QSurfaceFormat,
 )
-# IMPORTANT (Win11 / your PyQt6 build):
-# QOpenGL* classes and QOpenGLFunctions are NOT in PyQt6.QtGui for you.
-from PyQt6.QtOpenGL import (
-    QOpenGLShaderProgram,
-    QOpenGLShader,
-    QOpenGLBuffer,
-    QOpenGLVertexArrayObject,
-    QOpenGLFunctions_4_1_Core,
-)
-from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -38,8 +32,45 @@ from PyQt6.QtWidgets import (
     QLineEdit,
 )
 
+from PyQt6.QtOpenGLWidgets import QOpenGLWidget
+
+# IMPORTANT (Win11 / your PyQt6 build):
+# These are NOT in PyQt6.QtGui for you. Import from QtOpenGL.
+from PyQt6.QtOpenGL import (
+    QOpenGLShaderProgram,
+    QOpenGLShader,
+    QOpenGLBuffer,
+    QOpenGLVertexArrayObject,
+)
+
 from cupyturbo import dns_simulator as dns_all
 from cupyturbo.dns_wrapper import NumPyDnsSimulator
+
+
+# -----------------------------------------------------------------------------
+# OpenGL numeric constants (avoid gl.GL_* attributes: not exposed in your build)
+# -----------------------------------------------------------------------------
+GL_DEPTH_TEST = 0x0B71
+GL_COLOR_BUFFER_BIT = 0x00004000
+
+GL_TEXTURE_2D = 0x0DE1
+GL_TEXTURE0 = 0x84C0
+GL_TEXTURE1 = 0x84C1
+
+GL_UNPACK_ALIGNMENT = 0x0CF5
+GL_NEAREST = 0x2600
+GL_CLAMP_TO_EDGE = 0x812F
+
+GL_TRIANGLES = 0x0004
+GL_FLOAT = 0x1406
+
+GL_R8 = 0x8229
+GL_RED = 0x1903
+
+GL_RGB = 0x1907
+GL_RGB8 = 0x8051
+
+GL_UNSIGNED_BYTE = 0x1401
 
 
 # -----------------------------------------------------------------------------
@@ -92,49 +123,46 @@ def _make_fire_lut() -> np.ndarray:
 
 
 def _make_doom_fire_lut() -> np.ndarray:
-    key_colors = np.array(
-        [
-            [0, 0, 0],
-            [7, 7, 7],
-            [31, 7, 7],
-            [47, 15, 7],
-            [71, 15, 7],
-            [87, 23, 7],
-            [103, 31, 7],
-            [119, 31, 7],
-            [143, 39, 7],
-            [159, 47, 7],
-            [175, 63, 7],
-            [191, 71, 7],
-            [199, 71, 7],
-            [223, 79, 7],
-            [223, 87, 7],
-            [223, 87, 7],
-            [215, 95, 7],
-            [215, 95, 7],
-            [215, 103, 15],
-            [207, 111, 15],
-            [207, 119, 15],
-            [207, 127, 15],
-            [207, 135, 23],
-            [199, 135, 23],
-            [199, 143, 23],
-            [199, 151, 31],
-            [191, 159, 31],
-            [191, 159, 31],
-            [191, 167, 39],
-            [191, 167, 39],
-            [191, 175, 47],
-            [183, 175, 47],
-            [183, 183, 47],
-            [183, 183, 55],
-            [207, 207, 111],
-            [223, 223, 159],
-            [239, 239, 199],
-            [255, 255, 255],
-        ],
-        dtype=np.uint8,
-    )
+    key_colors = np.array([
+        [0, 0, 0],
+        [7, 7, 7],
+        [31, 7, 7],
+        [47, 15, 7],
+        [71, 15, 7],
+        [87, 23, 7],
+        [103, 31, 7],
+        [119, 31, 7],
+        [143, 39, 7],
+        [159, 47, 7],
+        [175, 63, 7],
+        [191, 71, 7],
+        [199, 71, 7],
+        [223, 79, 7],
+        [223, 87, 7],
+        [223, 87, 7],
+        [215, 95, 7],
+        [215, 95, 7],
+        [215, 103, 15],
+        [207, 111, 15],
+        [207, 119, 15],
+        [207, 127, 15],
+        [207, 135, 23],
+        [199, 135, 23],
+        [199, 143, 23],
+        [199, 151, 31],
+        [191, 159, 31],
+        [191, 159, 31],
+        [191, 167, 39],
+        [191, 167, 39],
+        [191, 175, 47],
+        [183, 175, 47],
+        [183, 183, 47],
+        [183, 183, 55],
+        [207, 207, 111],
+        [223, 223, 159],
+        [239, 239, 199],
+        [255, 255, 255],
+    ], dtype=np.uint8)
 
     stops = []
     n_keys = key_colors.shape[0]
@@ -285,33 +313,6 @@ COLOR_MAPS = {
 
 DEFAULT_CMAP_NAME = "Magma"
 
-# -----------------------------------------------------------------------------
-# OpenGL enum constants (numeric) — needed because your QOpenGLFunctions class
-# doesn't expose gl.GL_* constants as attributes on Win11.
-# -----------------------------------------------------------------------------
-GL_DEPTH_TEST = 0x0B71
-GL_COLOR_BUFFER_BIT = 0x00004000
-GL_TRIANGLES = 0x0004
-
-GL_TEXTURE_2D = 0x0DE1
-GL_TEXTURE0 = 0x84C0
-GL_TEXTURE1 = 0x84C1
-
-GL_UNPACK_ALIGNMENT = 0x0CF5
-GL_TEXTURE_MIN_FILTER = 0x2801
-GL_TEXTURE_MAG_FILTER = 0x2800
-GL_TEXTURE_WRAP_S = 0x2802
-GL_TEXTURE_WRAP_T = 0x2803
-GL_NEAREST = 0x2600
-GL_CLAMP_TO_EDGE = 0x812F
-
-GL_FLOAT = 0x1406
-GL_RGB = 0x1907
-GL_RED = 0x1903
-GL_UNSIGNED_BYTE = 0x1401
-GL_RGB8 = 0x8051
-GL_R8 = 0x8229
-
 
 # -----------------------------------------------------------------------------
 # OpenGL colormap widget
@@ -325,6 +326,7 @@ class GLColormapWidget(QOpenGLWidget):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
 
+        # NOTE: don't type this as QOpenGLFunctions; some PyQt6 builds don't expose it.
         self._gl: Optional[Any] = None
         self._prog: Optional[QOpenGLShaderProgram] = None
         self._vao: Optional[QOpenGLVertexArrayObject] = None
@@ -337,7 +339,8 @@ class GLColormapWidget(QOpenGLWidget):
         self._frame_h: int = 0
 
         self._pending_frame: Optional[np.ndarray] = None  # HxW uint8
-        self._pending_lut: Optional[np.ndarray] = None  # 256x3 uint8
+        self._pending_lut: Optional[np.ndarray] = None    # 256x3 uint8
+
         self._have_textures: bool = False
 
     def set_frame(self, pixels_u8: np.ndarray) -> None:
@@ -365,9 +368,8 @@ class GLColormapWidget(QOpenGLWidget):
         self.update()
 
     def initializeGL(self) -> None:
-        # Use a concrete functions table that exists in your PyQt6 build.
-        self._gl = QOpenGLFunctions_4_1_Core()
-        self._gl.initializeOpenGLFunctions()
+        # Grab the function table from the actual context.
+        self._gl = self.context().functions()  # type: ignore[assignment]
         gl = self._gl
 
         gl.glDisable(GL_DEPTH_TEST)
@@ -405,35 +407,15 @@ class GLColormapWidget(QOpenGLWidget):
         prog.link()
         self._prog = prog
 
-        verts = np.array(
-            [
-                -1.0,
-                -1.0,
-                0.0,
-                0.0,
-                1.0,
-                -1.0,
-                1.0,
-                0.0,
-                1.0,
-                1.0,
-                1.0,
-                1.0,
-                -1.0,
-                -1.0,
-                0.0,
-                0.0,
-                1.0,
-                1.0,
-                1.0,
-                1.0,
-                -1.0,
-                1.0,
-                0.0,
-                1.0,
-            ],
-            dtype=np.float32,
-        )
+        verts = np.array([
+            -1.0, -1.0, 0.0, 0.0,
+             1.0, -1.0, 1.0, 0.0,
+             1.0,  1.0, 1.0, 1.0,
+
+            -1.0, -1.0, 0.0, 0.0,
+             1.0,  1.0, 1.0, 1.0,
+            -1.0,  1.0, 0.0, 1.0,
+        ], dtype=np.float32)
 
         vao = QOpenGLVertexArrayObject()
         vao.create()
@@ -447,11 +429,11 @@ class GLColormapWidget(QOpenGLWidget):
         self._vbo = vbo
 
         prog.bind()
-        stride = 4 * 4
+        stride = 4 * 4  # bytes per vertex (4 floats)
         gl.glEnableVertexAttribArray(0)
-        gl.glVertexAttribPointer(0, 2, GL_FLOAT, False, stride, 0)
+        gl.glVertexAttribPointer(0, 2, GL_FLOAT, False, stride, ctypes.c_void_p(0))
         gl.glEnableVertexAttribArray(1)
-        gl.glVertexAttribPointer(1, 2, GL_FLOAT, False, stride, 8)
+        gl.glVertexAttribPointer(1, 2, GL_FLOAT, False, stride, ctypes.c_void_p(2 * 4))
         prog.release()
 
         vbo.release()
@@ -463,17 +445,17 @@ class GLColormapWidget(QOpenGLWidget):
         gl.glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
 
         gl.glBindTexture(GL_TEXTURE_2D, self._tex_frame)
-        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
-        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
-        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
-        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+        gl.glTexParameteri(GL_TEXTURE_2D, 0x2801, GL_NEAREST)       # GL_TEXTURE_MIN_FILTER
+        gl.glTexParameteri(GL_TEXTURE_2D, 0x2800, GL_NEAREST)       # GL_TEXTURE_MAG_FILTER
+        gl.glTexParameteri(GL_TEXTURE_2D, 0x2802, GL_CLAMP_TO_EDGE) # GL_TEXTURE_WRAP_S
+        gl.glTexParameteri(GL_TEXTURE_2D, 0x2803, GL_CLAMP_TO_EDGE) # GL_TEXTURE_WRAP_T
         gl.glBindTexture(GL_TEXTURE_2D, 0)
 
         gl.glBindTexture(GL_TEXTURE_2D, self._tex_lut)
-        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
-        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
-        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
-        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+        gl.glTexParameteri(GL_TEXTURE_2D, 0x2801, GL_NEAREST)       # GL_TEXTURE_MIN_FILTER
+        gl.glTexParameteri(GL_TEXTURE_2D, 0x2800, GL_NEAREST)       # GL_TEXTURE_MAG_FILTER
+        gl.glTexParameteri(GL_TEXTURE_2D, 0x2802, GL_CLAMP_TO_EDGE) # GL_TEXTURE_WRAP_S
+        gl.glTexParameteri(GL_TEXTURE_2D, 0x2803, GL_CLAMP_TO_EDGE) # GL_TEXTURE_WRAP_T
 
         default_lut = COLOR_MAPS.get(DEFAULT_CMAP_NAME, GRAY_LUT)
         default_lut = np.ascontiguousarray(default_lut, dtype=np.uint8)
@@ -1122,7 +1104,7 @@ def main() -> None:
     QSurfaceFormat.setDefaultFormat(fmt)
 
     app = QApplication(sys.argv)
-    sim = NumPyDnsSimulator()
+    sim = NumPyDnsSimulator(n=512)
     window = MainWindow(sim)
 
     screen = app.primaryScreen().availableGeometry()
