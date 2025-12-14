@@ -476,7 +476,7 @@ def dns_pao_host_init(S: DnsState):
     RANVEC = np.zeros(97, dtype=np.float32)
 
     # "warm-up" 97 calls
-    for _ in range(97):
+    for _ in range(99):
         frand(seed)
 
     # fill RANVEC
