@@ -5,6 +5,12 @@ import sys
 import time
 from typing import Optional
 
+# Keep BLAS from spawning extra threads (common culprit)
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"   # Apple Accelerate
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
+
 from PyQt6.QtCore import QSize, QTimer, Qt, QStandardPaths
 from PyQt6.QtGui import QImage, QPixmap, QFontDatabase, qRgb, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
