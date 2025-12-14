@@ -1,38 +1,6 @@
-nohup: ignoring input
 Running N=32 ...
  Checking CuPy...
-OS                           : Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.34
-Python Version               : 3.13.9
-CuPy Version                 : 13.6.0
-CuPy Platform                : NVIDIA CUDA
-NumPy Version                : 2.3.5
-SciPy Version                : 1.16.3
-Cython Build Version         : 3.1.7
-Cython Runtime Version       : None
-CUDA Root                    : /usr/local/cuda
-nvcc PATH                    : /usr/local/cuda/bin/nvcc
-CUDA Build Version           : 13000
-CUDA Driver Version          : 13010
-CUDA Runtime Version         : 13000 (linked to CuPy) / 13000 (locally installed)
-CUDA Extra Include Dirs      : []
-cuBLAS Version               : (available)
-cuFFT Version                : 12000
-cuRAND Version               : 10400
-cuSOLVER Version             : (12, 0, 4)
-cuSPARSE Version             : (available)
-NVRTC Version                : (13, 0)
-Thrust Version               : 200800
-CUB Build Version            : 200800
-Jitify Build Version         : <unknown>
-cuDNN Build Version          : None
-cuDNN Version                : None
-NCCL Build Version           : None
-NCCL Runtime Version         : None
-cuTENSOR Version             : None
-cuSPARSELt Build Version     : None
-Device 0 Name                : NVIDIA GeForce RTX 3090
-Device 0 Compute Capability  : 86
-Device 0 PCI Bus ID          : 0000:17:00.0
+ CuPy not installed
 --- INITIALIZING DNS_ALL PYTHON (NumPy/CuPy) ---
  N   = 32
  Re  = 10000
@@ -41,6 +9,7 @@ Device 0 PCI Bus ID          : 0000:17:00.0
  CFL  = 0.75
  requested = auto
  backend:  auto
+ workers: 6
  N           =          32
  Reynolds n. =     10000.0
  K0          =          10
@@ -64,49 +33,18 @@ Device 0 PCI Bus ID          : 0000:17:00.0
  E3          =      1.0000
  PAO seed    =        3138
  PAO initialization OK. VISC=0.0010583508
- effective = gpu (xp = cupy)
+ effective = cpu (xp = numpy)
  [NEXTDT INIT] CFLM=    18.6306 DT=  0.0128140 CN=  1.0000000
  Initial DT=  0.0128140 CN=  1.0000000
- ITERATION      1 T=0.0128139714 DT=0.01288009 CN=1.00515958
- ITERATION    100 T=1.2429281617 DT=0.01295491 CN=1.00510433
- ITERATION    101 T=1.2558830671 DT=0.01297650 CN=1.00166682
- Elapsed CPU time for 101 steps (s) =       0.2292
- Frames per second (FPS)                 =     440.7088
- Final T=1.2558830671  CN=1.0016668181  DT=0.0129764988  VISC=0.0010583508
+ ITERATION      1 T=0.0128139701 DT=0.01288009 CN=1.00515960
+ ITERATION    100 T=1.2429281925 DT=0.01295491 CN=1.00510431
+ ITERATION    101 T=1.2558830998 DT=0.01297650 CN=1.00166679
+ Elapsed CPU time for 101 steps (s) =       0.0101
+ Frames per second (FPS)                 =   10008.0104
+ Final T=1.2558830998  CN=1.0016667864  DT=0.0129765004  VISC=0.0010583508
 Running N=64 ...
  Checking CuPy...
-OS                           : Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.34
-Python Version               : 3.13.9
-CuPy Version                 : 13.6.0
-CuPy Platform                : NVIDIA CUDA
-NumPy Version                : 2.3.5
-SciPy Version                : 1.16.3
-Cython Build Version         : 3.1.7
-Cython Runtime Version       : None
-CUDA Root                    : /usr/local/cuda
-nvcc PATH                    : /usr/local/cuda/bin/nvcc
-CUDA Build Version           : 13000
-CUDA Driver Version          : 13010
-CUDA Runtime Version         : 13000 (linked to CuPy) / 13000 (locally installed)
-CUDA Extra Include Dirs      : []
-cuBLAS Version               : (available)
-cuFFT Version                : 12000
-cuRAND Version               : 10400
-cuSOLVER Version             : (12, 0, 4)
-cuSPARSE Version             : (available)
-NVRTC Version                : (13, 0)
-Thrust Version               : 200800
-CUB Build Version            : 200800
-Jitify Build Version         : <unknown>
-cuDNN Build Version          : None
-cuDNN Version                : None
-NCCL Build Version           : None
-NCCL Runtime Version         : None
-cuTENSOR Version             : None
-cuSPARSELt Build Version     : None
-Device 0 Name                : NVIDIA GeForce RTX 3090
-Device 0 Compute Capability  : 86
-Device 0 PCI Bus ID          : 0000:17:00.0
+ CuPy not installed
 --- INITIALIZING DNS_ALL PYTHON (NumPy/CuPy) ---
  N   = 64
  Re  = 10000
@@ -115,6 +53,7 @@ Device 0 PCI Bus ID          : 0000:17:00.0
  CFL  = 0.75
  requested = auto
  backend:  auto
+ workers: 6
  N           =          64
  Reynolds n. =     10000.0
  K0          =          10
@@ -138,49 +77,18 @@ Device 0 PCI Bus ID          : 0000:17:00.0
  E3          =      1.0000
  PAO seed    =        4921
  PAO initialization OK. VISC=0.0009968943
- effective = gpu (xp = cupy)
+ effective = cpu (xp = numpy)
  [NEXTDT INIT] CFLM=    37.7238 DT=  0.0063284 CN=  1.0000000
  Initial DT=  0.0063284 CN=  1.0000000
  ITERATION      1 T=0.0063284289 DT=0.00631925 CN=0.99854925
- ITERATION    100 T=0.5905239829 DT=0.00600211 CN=1.00367663
- ITERATION    101 T=0.5965260912 DT=0.00601782 CN=1.00261758
- Elapsed CPU time for 101 steps (s) =       0.2065
- Frames per second (FPS)                 =     488.9858
- Final T=0.5965260912  CN=1.0026175752  DT=0.0060178193  VISC=0.0009968943
+ ITERATION    100 T=0.5905239354 DT=0.00600211 CN=1.00367663
+ ITERATION    101 T=0.5965260426 DT=0.00601782 CN=1.00261756
+ Elapsed CPU time for 101 steps (s) =       0.0225
+ Frames per second (FPS)                 =    4482.5305
+ Final T=0.5965260426  CN=1.0026175552  DT=0.0060178180  VISC=0.0009968943
 Running N=128 ...
  Checking CuPy...
-OS                           : Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.34
-Python Version               : 3.13.9
-CuPy Version                 : 13.6.0
-CuPy Platform                : NVIDIA CUDA
-NumPy Version                : 2.3.5
-SciPy Version                : 1.16.3
-Cython Build Version         : 3.1.7
-Cython Runtime Version       : None
-CUDA Root                    : /usr/local/cuda
-nvcc PATH                    : /usr/local/cuda/bin/nvcc
-CUDA Build Version           : 13000
-CUDA Driver Version          : 13010
-CUDA Runtime Version         : 13000 (linked to CuPy) / 13000 (locally installed)
-CUDA Extra Include Dirs      : []
-cuBLAS Version               : (available)
-cuFFT Version                : 12000
-cuRAND Version               : 10400
-cuSOLVER Version             : (12, 0, 4)
-cuSPARSE Version             : (available)
-NVRTC Version                : (13, 0)
-Thrust Version               : 200800
-CUB Build Version            : 200800
-Jitify Build Version         : <unknown>
-cuDNN Build Version          : None
-cuDNN Version                : None
-NCCL Build Version           : None
-NCCL Runtime Version         : None
-cuTENSOR Version             : None
-cuSPARSELt Build Version     : None
-Device 0 Name                : NVIDIA GeForce RTX 3090
-Device 0 Compute Capability  : 86
-Device 0 PCI Bus ID          : 0000:17:00.0
+ CuPy not installed
 --- INITIALIZING DNS_ALL PYTHON (NumPy/CuPy) ---
  N   = 128
  Re  = 10000
@@ -189,6 +97,7 @@ Device 0 PCI Bus ID          : 0000:17:00.0
  CFL  = 0.75
  requested = auto
  backend:  auto
+ workers: 6
  N           =         128
  Reynolds n. =     10000.0
  K0          =          10
@@ -212,49 +121,18 @@ Device 0 PCI Bus ID          : 0000:17:00.0
  E3          =      1.0000
  PAO seed    =        2115
  PAO initialization OK. VISC=0.0009968169
- effective = gpu (xp = cupy)
+ effective = cpu (xp = numpy)
  [NEXTDT INIT] CFLM=    94.9915 DT=  0.0025132 CN=  1.0000000
  Initial DT=  0.0025132 CN=  1.0000000
- ITERATION      1 T=0.0025131970 DT=0.00251280 CN=0.99984169
- ITERATION    100 T=0.2515167170 DT=0.00274625 CN=1.00391176
- ITERATION    101 T=0.2542629667 DT=0.00275737 CN=1.00404879
- Elapsed CPU time for 101 steps (s) =       0.2259
- Frames per second (FPS)                 =     447.1363
- Final T=0.2542629667  CN=1.0040487877  DT=0.0027573687  VISC=0.0009968169
+ ITERATION      1 T=0.0025131968 DT=0.00251280 CN=0.99984171
+ ITERATION    100 T=0.2515167094 DT=0.00274625 CN=1.00391174
+ ITERATION    101 T=0.2542629585 DT=0.00275737 CN=1.00404883
+ Elapsed CPU time for 101 steps (s) =       0.0666
+ Frames per second (FPS)                 =    1517.3899
+ Final T=0.2542629585  CN=1.0040488308  DT=0.0027573682  VISC=0.0009968169
 Running N=256 ...
  Checking CuPy...
-OS                           : Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.34
-Python Version               : 3.13.9
-CuPy Version                 : 13.6.0
-CuPy Platform                : NVIDIA CUDA
-NumPy Version                : 2.3.5
-SciPy Version                : 1.16.3
-Cython Build Version         : 3.1.7
-Cython Runtime Version       : None
-CUDA Root                    : /usr/local/cuda
-nvcc PATH                    : /usr/local/cuda/bin/nvcc
-CUDA Build Version           : 13000
-CUDA Driver Version          : 13010
-CUDA Runtime Version         : 13000 (linked to CuPy) / 13000 (locally installed)
-CUDA Extra Include Dirs      : []
-cuBLAS Version               : (available)
-cuFFT Version                : 12000
-cuRAND Version               : 10400
-cuSOLVER Version             : (12, 0, 4)
-cuSPARSE Version             : (available)
-NVRTC Version                : (13, 0)
-Thrust Version               : 200800
-CUB Build Version            : 200800
-Jitify Build Version         : <unknown>
-cuDNN Build Version          : None
-cuDNN Version                : None
-NCCL Build Version           : None
-NCCL Runtime Version         : None
-cuTENSOR Version             : None
-cuSPARSELt Build Version     : None
-Device 0 Name                : NVIDIA GeForce RTX 3090
-Device 0 Compute Capability  : 86
-Device 0 PCI Bus ID          : 0000:17:00.0
+ CuPy not installed
 --- INITIALIZING DNS_ALL PYTHON (NumPy/CuPy) ---
  N   = 256
  Re  = 10000
@@ -263,6 +141,7 @@ Device 0 PCI Bus ID          : 0000:17:00.0
  CFL  = 0.75
  requested = auto
  backend:  auto
+ workers: 6
  N           =         256
  Reynolds n. =     10000.0
  K0          =          10
@@ -286,49 +165,18 @@ Device 0 PCI Bus ID          : 0000:17:00.0
  E3          =      1.0000
  PAO seed    =         614
  PAO initialization OK. VISC=0.0009968169
- effective = gpu (xp = cupy)
+ effective = cpu (xp = numpy)
  [NEXTDT INIT] CFLM=   147.0106 DT=  0.0016239 CN=  1.0000000
  Initial DT=  0.0016239 CN=  1.0000000
  ITERATION      1 T=0.0016239130 DT=0.00162426 CN=1.00021490
- ITERATION    100 T=0.1668507479 DT=0.00168243 CN=0.99972890
- ITERATION    101 T=0.1685331828 DT=0.00168213 CN=0.99981895
- Elapsed CPU time for 101 steps (s) =       0.2073
- Frames per second (FPS)                 =     487.3015
- Final T=0.1685331828  CN=0.9998189499  DT=0.0016821302  VISC=0.0009968169
+ ITERATION    100 T=0.1668507193 DT=0.00168243 CN=0.99972888
+ ITERATION    101 T=0.1685331539 DT=0.00168213 CN=0.99981898
+ Elapsed CPU time for 101 steps (s) =       0.3039
+ Frames per second (FPS)                 =     332.3258
+ Final T=0.1685331539  CN=0.9998189768  DT=0.0016821301  VISC=0.0009968169
 Running N=512 ...
  Checking CuPy...
-OS                           : Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.34
-Python Version               : 3.13.9
-CuPy Version                 : 13.6.0
-CuPy Platform                : NVIDIA CUDA
-NumPy Version                : 2.3.5
-SciPy Version                : 1.16.3
-Cython Build Version         : 3.1.7
-Cython Runtime Version       : None
-CUDA Root                    : /usr/local/cuda
-nvcc PATH                    : /usr/local/cuda/bin/nvcc
-CUDA Build Version           : 13000
-CUDA Driver Version          : 13010
-CUDA Runtime Version         : 13000 (linked to CuPy) / 13000 (locally installed)
-CUDA Extra Include Dirs      : []
-cuBLAS Version               : (available)
-cuFFT Version                : 12000
-cuRAND Version               : 10400
-cuSOLVER Version             : (12, 0, 4)
-cuSPARSE Version             : (available)
-NVRTC Version                : (13, 0)
-Thrust Version               : 200800
-CUB Build Version            : 200800
-Jitify Build Version         : <unknown>
-cuDNN Build Version          : None
-cuDNN Version                : None
-NCCL Build Version           : None
-NCCL Runtime Version         : None
-cuTENSOR Version             : None
-cuSPARSELt Build Version     : None
-Device 0 Name                : NVIDIA GeForce RTX 3090
-Device 0 Compute Capability  : 86
-Device 0 PCI Bus ID          : 0000:17:00.0
+ CuPy not installed
 --- INITIALIZING DNS_ALL PYTHON (NumPy/CuPy) ---
  N   = 512
  Re  = 10000
@@ -337,6 +185,7 @@ Device 0 PCI Bus ID          : 0000:17:00.0
  CFL  = 0.75
  requested = auto
  backend:  auto
+ workers: 6
  N           =         512
  Reynolds n. =     10000.0
  K0          =          10
@@ -360,49 +209,18 @@ Device 0 PCI Bus ID          : 0000:17:00.0
  E3          =      1.0000
  PAO seed    =        1489
  PAO initialization OK. VISC=0.0009968169
- effective = gpu (xp = cupy)
- [NEXTDT INIT] CFLM=   333.7851 DT=  0.0007152 CN=  1.0000000
+ effective = cpu (xp = numpy)
+ [NEXTDT INIT] CFLM=   333.7852 DT=  0.0007152 CN=  1.0000000
  Initial DT=  0.0007152 CN=  1.0000000
- ITERATION      1 T=0.0007152278 DT=0.00071515 CN=0.99988540
- ITERATION    100 T=0.0704590940 DT=0.00069915 CN=0.99996920
- ITERATION    101 T=0.0711582393 DT=0.00069912 CN=0.99997080
- Elapsed CPU time for 101 steps (s) =       0.1926
- Frames per second (FPS)                 =     524.3054
- Final T=0.0711582393  CN=0.9999708008  DT=0.0006991249  VISC=0.0009968169
+ ITERATION      1 T=0.0007152278 DT=0.00071515 CN=0.99988538
+ ITERATION    100 T=0.0704590929 DT=0.00069915 CN=0.99996918
+ ITERATION    101 T=0.0711582381 DT=0.00069912 CN=0.99997082
+ Elapsed CPU time for 101 steps (s) =       1.3838
+ Frames per second (FPS)                 =      72.9867
+ Final T=0.0711582381  CN=0.9999708218  DT=0.0006991249  VISC=0.0009968169
 Running N=1024 ...
  Checking CuPy...
-OS                           : Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.34
-Python Version               : 3.13.9
-CuPy Version                 : 13.6.0
-CuPy Platform                : NVIDIA CUDA
-NumPy Version                : 2.3.5
-SciPy Version                : 1.16.3
-Cython Build Version         : 3.1.7
-Cython Runtime Version       : None
-CUDA Root                    : /usr/local/cuda
-nvcc PATH                    : /usr/local/cuda/bin/nvcc
-CUDA Build Version           : 13000
-CUDA Driver Version          : 13010
-CUDA Runtime Version         : 13000 (linked to CuPy) / 13000 (locally installed)
-CUDA Extra Include Dirs      : []
-cuBLAS Version               : (available)
-cuFFT Version                : 12000
-cuRAND Version               : 10400
-cuSOLVER Version             : (12, 0, 4)
-cuSPARSE Version             : (available)
-NVRTC Version                : (13, 0)
-Thrust Version               : 200800
-CUB Build Version            : 200800
-Jitify Build Version         : <unknown>
-cuDNN Build Version          : None
-cuDNN Version                : None
-NCCL Build Version           : None
-NCCL Runtime Version         : None
-cuTENSOR Version             : None
-cuSPARSELt Build Version     : None
-Device 0 Name                : NVIDIA GeForce RTX 3090
-Device 0 Compute Capability  : 86
-Device 0 PCI Bus ID          : 0000:17:00.0
+ CuPy not installed
 --- INITIALIZING DNS_ALL PYTHON (NumPy/CuPy) ---
  N   = 1024
  Re  = 10000
@@ -411,6 +229,7 @@ Device 0 PCI Bus ID          : 0000:17:00.0
  CFL  = 0.75
  requested = auto
  backend:  auto
+ workers: 6
  N           =        1024
  Reynolds n. =     10000.0
  K0          =          10
@@ -418,7 +237,7 @@ Device 0 PCI Bus ID          : 0000:17:00.0
  WiWi        =    100.0000
  Epsilon     =      0.0997
  a11         =      0.0000
- e11         =     -0.0000
+ e11         =      0.0000
  Time scale  =      5.0000
  Kolmogorov  =      0.0100
  Viscosity   =      0.0010
@@ -434,49 +253,18 @@ Device 0 PCI Bus ID          : 0000:17:00.0
  E3          =      1.0000
  PAO seed    =        1458
  PAO initialization OK. VISC=0.0009968169
- effective = gpu (xp = cupy)
+ effective = cpu (xp = numpy)
  [NEXTDT INIT] CFLM=   609.7739 DT=  0.0003915 CN=  1.0000000
  Initial DT=  0.0003915 CN=  1.0000000
- ITERATION      1 T=0.0003915097 DT=0.00039149 CN=0.99994886
- ITERATION    100 T=0.0386924578 DT=0.00038208 CN=0.99976325
- ITERATION    101 T=0.0390745407 DT=0.00038199 CN=0.99976614
- Elapsed CPU time for 101 steps (s) =       0.6081
- Frames per second (FPS)                 =     166.0969
- Final T=0.0390745407  CN=0.9997661447  DT=0.0003819936  VISC=0.0009968169
+ ITERATION      1 T=0.0003915098 DT=0.00039149 CN=0.99994882
+ ITERATION    100 T=0.0386924580 DT=0.00038208 CN=0.99976324
+ ITERATION    101 T=0.0390745409 DT=0.00038199 CN=0.99976618
+ Elapsed CPU time for 101 steps (s) =       5.7149
+ Frames per second (FPS)                 =      17.6730
+ Final T=0.0390745409  CN=0.9997661776  DT=0.0003819936  VISC=0.0009968169
 Running N=2048 ...
  Checking CuPy...
-OS                           : Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.34
-Python Version               : 3.13.9
-CuPy Version                 : 13.6.0
-CuPy Platform                : NVIDIA CUDA
-NumPy Version                : 2.3.5
-SciPy Version                : 1.16.3
-Cython Build Version         : 3.1.7
-Cython Runtime Version       : None
-CUDA Root                    : /usr/local/cuda
-nvcc PATH                    : /usr/local/cuda/bin/nvcc
-CUDA Build Version           : 13000
-CUDA Driver Version          : 13010
-CUDA Runtime Version         : 13000 (linked to CuPy) / 13000 (locally installed)
-CUDA Extra Include Dirs      : []
-cuBLAS Version               : (available)
-cuFFT Version                : 12000
-cuRAND Version               : 10400
-cuSOLVER Version             : (12, 0, 4)
-cuSPARSE Version             : (available)
-NVRTC Version                : (13, 0)
-Thrust Version               : 200800
-CUB Build Version            : 200800
-Jitify Build Version         : <unknown>
-cuDNN Build Version          : None
-cuDNN Version                : None
-NCCL Build Version           : None
-NCCL Runtime Version         : None
-cuTENSOR Version             : None
-cuSPARSELt Build Version     : None
-Device 0 Name                : NVIDIA GeForce RTX 3090
-Device 0 Compute Capability  : 86
-Device 0 PCI Bus ID          : 0000:17:00.0
+ CuPy not installed
 --- INITIALIZING DNS_ALL PYTHON (NumPy/CuPy) ---
  N   = 2048
  Re  = 10000
@@ -485,6 +273,7 @@ Device 0 PCI Bus ID          : 0000:17:00.0
  CFL  = 0.75
  requested = auto
  backend:  auto
+ workers: 6
  N           =        2048
  Reynolds n. =     10000.0
  K0          =          10
@@ -508,87 +297,13 @@ Device 0 PCI Bus ID          : 0000:17:00.0
  E3          =      1.0000
  PAO seed    =        4947
  PAO initialization OK. VISC=0.0009968169
- effective = gpu (xp = cupy)
- [NEXTDT INIT] CFLM=  1274.0155 DT=  0.0001874 CN=  1.0000000
+ effective = cpu (xp = numpy)
+ [NEXTDT INIT] CFLM=  1274.0156 DT=  0.0001874 CN=  1.0000000
  Initial DT=  0.0001874 CN=  1.0000000
  ITERATION      1 T=0.0001873858 DT=0.00018739 CN=0.99999626
- ITERATION    100 T=0.0187302803 DT=0.00018734 CN=1.00002086
- ITERATION    101 T=0.0189176177 DT=0.00018734 CN=1.00001926
- Elapsed CPU time for 101 steps (s) =       1.2347
- Frames per second (FPS)                 =      81.7987
- Final T=0.0189176177  CN=1.0000192550  DT=0.0001873410  VISC=0.0009968169
+ ITERATION    100 T=0.0187302801 DT=0.00018734 CN=1.00002088
+ ITERATION    101 T=0.0189176175 DT=0.00018734 CN=1.00001929
+ Elapsed CPU time for 101 steps (s) =      26.0698
+ Frames per second (FPS)                 =       3.8742
+ Final T=0.0189176175  CN=1.0000192909  DT=0.0001873410  VISC=0.0009968169
 Running N=4096 ...
- Checking CuPy...
-OS                           : Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.34
-Python Version               : 3.13.9
-CuPy Version                 : 13.6.0
-CuPy Platform                : NVIDIA CUDA
-NumPy Version                : 2.3.5
-SciPy Version                : 1.16.3
-Cython Build Version         : 3.1.7
-Cython Runtime Version       : None
-CUDA Root                    : /usr/local/cuda
-nvcc PATH                    : /usr/local/cuda/bin/nvcc
-CUDA Build Version           : 13000
-CUDA Driver Version          : 13010
-CUDA Runtime Version         : 13000 (linked to CuPy) / 13000 (locally installed)
-CUDA Extra Include Dirs      : []
-cuBLAS Version               : (available)
-cuFFT Version                : 12000
-cuRAND Version               : 10400
-cuSOLVER Version             : (12, 0, 4)
-cuSPARSE Version             : (available)
-NVRTC Version                : (13, 0)
-Thrust Version               : 200800
-CUB Build Version            : 200800
-Jitify Build Version         : <unknown>
-cuDNN Build Version          : None
-cuDNN Version                : None
-NCCL Build Version           : None
-NCCL Runtime Version         : None
-cuTENSOR Version             : None
-cuSPARSELt Build Version     : None
-Device 0 Name                : NVIDIA GeForce RTX 3090
-Device 0 Compute Capability  : 86
-Device 0 PCI Bus ID          : 0000:17:00.0
---- INITIALIZING DNS_ALL PYTHON (NumPy/CuPy) ---
- N   = 4096
- Re  = 10000
- K0  = 10.0
- Steps = 101
- CFL  = 0.75
- requested = auto
- backend:  auto
- N           =        4096
- Reynolds n. =     10000.0
- K0          =          10
- Energy      =      0.9968
- WiWi        =    100.0000
- Epsilon     =      0.0997
- a11         =      0.0000
- e11         =      0.0000
- Time scale  =      5.0000
- Kolmogorov  =      0.0100
- Viscosity   =      0.0010
- dx/Kol.     =      0.1536
- 2Pi/Nlamda  =     18.7245
- 2Pi/Lux     =     22.2496
- 2Pi/Luz     =     38.5380
- 2Pi/Lwx     =     38.5380
- 2Pi/Lwz     =     22.2496
- Deps.       =      0.0397
- Ceps2       =      1.9936
- E1          =      1.0000
- E3          =      1.0000
- PAO seed    =        4224
- PAO initialization OK. VISC=0.0009968169
- effective = gpu (xp = cupy)
- [NEXTDT INIT] CFLM=  2389.7471 DT=  0.0000999 CN=  1.0000000
- Initial DT=  0.0000999 CN=  1.0000000
- ITERATION      1 T=0.0000998986 DT=0.00009990 CN=1.00000584
- ITERATION    100 T=0.0100033808 DT=0.00010019 CN=1.00003276
- ITERATION    101 T=0.0101035712 DT=0.00010019 CN=1.00003295
- Elapsed CPU time for 101 steps (s) =       3.4540
- Frames per second (FPS)                 =      29.2419
- Final T=0.0101035712  CN=1.0000329525  DT=0.0001001937  VISC=0.0009968169
-Done. Results written to fps_sweep.csv

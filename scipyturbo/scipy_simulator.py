@@ -352,6 +352,11 @@ def create_dns_state(
     )
     print(f" workers: {state.fft_workers}")
 
+    # apply workers to SciPy FFT (CPU only)
+    if state.backend == "cpu" and _spfft is not None:
+        _spfft.set_workers(state.fft_workers)
+        print(f" scipy.fft workers now = {_spfft.get_workers()}")
+
     # Allocate arrays
     state.ur = xp.zeros((NZ, NX, 3), dtype=xp.float32)
     state.uc = xp.zeros((NZ, NK, 3), dtype=xp.complex64)
