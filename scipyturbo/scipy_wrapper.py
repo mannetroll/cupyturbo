@@ -49,7 +49,7 @@ class NumPyDnsSimulator:
         self.max_steps = 5000
 
         # --- ONLY: max SciPy FFT workers on CPU ---
-        self.fft_workers = 8
+        self.fft_workers = 6
         print(f" workers = {self.fft_workers}")
 
         # UR dimensions from Fortran workspace: UR(2+3N/2, 3N/2, 3)
