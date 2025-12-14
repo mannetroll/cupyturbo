@@ -1416,6 +1416,7 @@ def run_dns(
     print(f" [NEXTDT INIT] CFLM={CFLM:11.4f} DT={S.dt:11.7f} CN={S.cn:11.7f}")
     print(f" Initial DT={S.dt:11.7f} CN={S.cn:11.7f}")
 
+    S.sync()
     t0 = time.perf_counter()
 
     for it in range(1, STEPS + 1):
