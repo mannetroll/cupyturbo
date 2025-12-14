@@ -18,11 +18,11 @@ def label_from_filename(path: str) -> str:
     key = name.lower()
 
     label_map = {
-        "cuda":    "cuda (.cu)",
-        "cupy":    "cupy (.py)",
-        "fortran": "fortran (.f77)",
-        "numpy":   "numpy (.py)",
-        "scipy":   "scipy (.py)",
+        "cuda":    "cuda (.cu) RTX 3090",
+        "cupy":    "cupy (.py) RTX 3090",
+        "fortran": "fortran (.f77) Apple M1",
+        "numpy":   "numpy (.py) Apple M1",
+        "scipy":   "scipy (.py) Apple M1",
     }
 
     # exact match first, then fall back to substring match (for names like "cuda_fast", etc.)
