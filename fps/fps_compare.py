@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import csv
 import os
+import math
 from glob import glob
 from typing import List, Tuple
 
@@ -42,23 +43,56 @@ def main() -> None:
         raise SystemExit(f"No CSV files found matching {CSV_GLOB}")
 
     markers = ["o", "s", "^", "D", "v", "x", "*", "+"]
-    fig = plt.figure(figsize=(9, 5))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
     fig.canvas.manager.set_window_title("fps_compare")
+
+    # Track overall N range for nice integer ticks on the lin-log plot
+    all_n_min = None
+    all_n_max = None
 
     for i, fn in enumerate(files):
         n, fps = load_nf(fn)
-        plt.plot(n, fps, marker=markers[i % len(markers)], label=label_from_filename(fn))
+        lbl = label_from_filename(fn)
+        m = markers[i % len(markers)]
 
-    plt.xscale("log", base=2)
-    plt.yscale("log")
-    plt.xlabel("Grid size N (N = 2^K)")
-    plt.ylabel("Frames per second (FPS)")
-    plt.title("DNS FPS vs Grid Size (comparison)")
-    plt.grid(True, which="both", linestyle="--", alpha=0.5)
-    plt.legend()
+        # Plot 1: log-log
+        ax1.plot(n, fps, marker=m, label=lbl)
 
-    plt.tight_layout()
-    plt.savefig(OUT_PNG, dpi=150)
+        # Plot 2: lin-log
+        ax2.plot(n, fps, marker=m, label=lbl)
+
+        all_n_min = min(n) if all_n_min is None else min(all_n_min, min(n))
+        all_n_max = max(n) if all_n_max is None else max(all_n_max, max(n))
+
+    # ---- Left subplot: log-log (x base 2) ----
+    ax1.set_xscale("log", base=2)
+    ax1.set_yscale("log")
+    ax1.set_xlabel("Grid size N (N = 2^K)")
+    ax1.set_ylabel("Frames per second (FPS)")
+    ax1.set_title("log-log")
+    ax1.grid(True, which="both", linestyle="--", alpha=0.5)
+
+    # ---- Right subplot: lin-log (x as integer values) ----
+    ax2.set_yscale("log")
+    ax2.set_xlabel("Grid size N (integer)")
+    ax2.set_title("lin-log")
+    ax2.grid(True, which="both", linestyle="--", alpha=0.5)
+
+    # Force integer ticks at powers of two across the plotted range (prevents 1e3 formatting)
+    if all_n_min is not None and all_n_max is not None and all_n_min > 0:
+        k_min = int(math.floor(math.log2(all_n_min)))
+        k_max = int(math.ceil(math.log2(all_n_max)))
+        xticks = [2 ** k for k in range(k_min, k_max + 1)]
+        ax2.set_xticks(xticks)
+        ax2.set_xticklabels([str(t) for t in xticks], rotation=45, ha="right")
+        ax2.set_xlim(all_n_min, all_n_max)
+
+    # Legend (once is enough)
+    ax1.legend(loc="best")
+
+    fig.suptitle("DNS FPS vs Grid Size (comparison)")
+    fig.tight_layout(rect=[0, 0, 1, 0.93])
+    fig.savefig(OUT_PNG, dpi=150)
     plt.show()
 
 
