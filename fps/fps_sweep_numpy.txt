@@ -257,3 +257,89 @@ Running N=1024 ...
  Frames per second (FPS)                 =       8.9437
  Final T=      0.0367  CN=      1.0004  DT=      0.0004  VISC=      0.0010
 Running N=2048 ...
+ Checking CuPy...
+ CuPy not installed
+--- INITIALIZING DNS_ALL PYTHON (NumPy/CuPy) ---
+ N   = 2048
+ Re  = 10000
+ K0  = 10.0
+ Steps = 101
+ CFL  = 0.75
+ requested = auto
+ backend:  auto
+ N           =        2048
+ Reynolds n. =     10000.0
+ K0          =          10
+ Energy      =      0.9968
+ WiWi        =    100.0000
+ Epsilon     =      0.0997
+ a11         =     -0.0000
+ e11         =      0.0000
+ Time scale  =      5.0000
+ Kolmogorov  =      0.0100
+ Viscosity   =      0.0010
+ dx/Kol.     =      0.3073
+ 2Pi/Nlamda  =     18.7245
+ 2Pi/Lux     =     22.2496
+ 2Pi/Luz     =     38.5380
+ 2Pi/Lwx     =     38.5380
+ 2Pi/Lwz     =     22.2496
+ Deps.       =      0.0397
+ Ceps2       =      1.9936
+ E1          =      1.0000
+ E3          =      1.0000
+ PAO seed    =        2960
+ PAO initialization OK. VISC=0.0009968169
+ effective = cpu (xp = numpy)
+ [NEXTDT INIT] CFLM=  1451.8560 DT=  0.0001644 CN=  1.0000000
+ Initial DT=  0.0001644 CN=  1.0000000
+ ITERATION      1 T=      0.0002 DT= 0.0001644 CN= 1.0000258
+ ITERATION    100 T=      0.0166 DT= 0.0001670 CN= 1.0001908
+ ITERATION    101 T=      0.0167 DT= 0.0001670 CN= 1.0001880
+ Elapsed CPU time for 101 steps (s) =      50.2140
+ Frames per second (FPS)                 =       2.0114
+ Final T=      0.0167  CN=      1.0002  DT=      0.0002  VISC=      0.0010
+Running N=4096 ...
+ Checking CuPy...
+ CuPy not installed
+--- INITIALIZING DNS_ALL PYTHON (NumPy/CuPy) ---
+ N   = 4096
+ Re  = 10000
+ K0  = 10.0
+ Steps = 101
+ CFL  = 0.75
+ requested = auto
+ backend:  auto
+ N           =        4096
+ Reynolds n. =     10000.0
+ K0          =          10
+ Energy      =      0.9968
+ WiWi        =    100.0000
+ Epsilon     =      0.0997
+ a11         =     -0.0000
+ e11         =      0.0000
+ Time scale  =      5.0000
+ Kolmogorov  =      0.0100
+ Viscosity   =      0.0010
+ dx/Kol.     =      0.1536
+ 2Pi/Nlamda  =     18.7245
+ 2Pi/Lux     =     22.2496
+ 2Pi/Luz     =     38.5380
+ 2Pi/Lwx     =     38.5380
+ 2Pi/Lwz     =     22.2496
+ Deps.       =      0.0397
+ Ceps2       =      1.9936
+ E1          =      1.0000
+ E3          =      1.0000
+ PAO seed    =        2736
+ PAO initialization OK. VISC=0.0009968169
+ effective = cpu (xp = numpy)
+ [NEXTDT INIT] CFLM=  2757.6890 DT=  0.0000866 CN=  1.0000000
+ Initial DT=  0.0000866 CN=  1.0000000
+ ITERATION      1 T=      0.0001 DT= 0.0000866 CN= 0.9999997
+ ITERATION    100 T=      0.0087 DT= 0.0000866 CN= 1.0000047
+ ITERATION    101 T=      0.0087 DT= 0.0000866 CN= 1.0000047
+ Elapsed CPU time for 101 steps (s) =     237.4017
+ Frames per second (FPS)                 =       0.4254
+ Final T=      0.0087  CN=      1.0000  DT=      0.0001  VISC=      0.0010
+Done. Results written to fps_sweep_numpy.csv

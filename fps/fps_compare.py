@@ -14,10 +14,25 @@ OUT_PNG = "fps_compare.png"
 
 def label_from_filename(path: str) -> str:
     base = os.path.basename(path)
-    name = os.path.splitext(base)[0]
-    name = name.replace("fps_sweep_", "")
-    return name
+    name = os.path.splitext(base)[0].replace("fps_sweep_", "")
+    key = name.lower()
 
+    label_map = {
+        "cuda":    "cuda (.cu)",
+        "cupy":    "cupy (.py)",
+        "fortran": "fortran (.f77)",
+        "numpy":   "numpy (.py)",
+        "scipy":   "scipy (.py)",
+    }
+
+    # exact match first, then fall back to substring match (for names like "cuda_fast", etc.)
+    if key in label_map:
+        return label_map[key]
+    for k, v in label_map.items():
+        if k in key:
+            return v
+
+    return name
 
 def load_nf(filename: str) -> Tuple[List[int], List[float]]:
     n_vals: List[int] = []
@@ -41,6 +56,8 @@ def main() -> None:
         raise SystemExit(f"No CSV files found matching {CSV_GLOB}")
 
     markers = ["o", "s", "^", "D", "v", "x", "*", "+"]
+    linestyles = ["-", "--", "-.", ":", (0, (5, 1)), (0, (3, 1, 1, 1))]
+
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 8))
     fig.canvas.manager.set_window_title("fps_compare")
 
@@ -51,9 +68,10 @@ def main() -> None:
         n, fps = load_nf(fn)
         lbl = label_from_filename(fn)
         m = markers[i % len(markers)]
+        ls = linestyles[i % len(linestyles)]
 
-        ax1.plot(n, fps, marker=m, label=lbl)  # log-log
-        ax2.plot(n, fps, marker=m, label=lbl)  # log-lin
+        ax1.plot(n, fps, marker=m, linestyle=ls, label=lbl)  # log-log
+        ax2.plot(n, fps, marker=m, linestyle=ls, label=lbl)  # log-lin
 
         all_n_min = min(n) if all_n_min is None else min(all_n_min, min(n))
         all_n_max = max(n) if all_n_max is None else max(all_n_max, max(n))
@@ -69,12 +87,12 @@ def main() -> None:
 
     # ---- Right subplot: log-lin ----
     ax2.set_xscale("log", base=2)  # log x
-    # y stays linear
     ax2.set_xlabel("Grid size N (integer)")
     ax2.set_ylabel("Frames per second (FPS)")
     ax2.set_ylim(0, 100)
     ax2.set_title("log-lin")
     ax2.grid(True, which="both", linestyle="--", alpha=0.5)
+    ax2.legend(loc="best")
 
     # Integer tick labels at powers of two (avoid 1eX formatting)
     if all_n_min is not None and all_n_max is not None and all_n_min > 0:
@@ -84,7 +102,6 @@ def main() -> None:
         ax2.set_xticks(xticks)
         ax2.set_xticklabels([str(t) for t in xticks], rotation=45, ha="right")
         ax2.set_xlim(512, 8192)
-        #ax2.set_xlim(all_n_min, all_n_max)
 
     fig.suptitle("DNS FPS vs Grid Size (comparison)")
     fig.tight_layout(rect=[0, 0, 1, 0.93])
