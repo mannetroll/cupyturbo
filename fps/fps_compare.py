@@ -42,7 +42,8 @@ def main() -> None:
         raise SystemExit(f"No CSV files found matching {CSV_GLOB}")
 
     markers = ["o", "s", "^", "D", "v", "x", "*", "+"]
-    plt.figure(figsize=(9, 5))
+    fig = plt.figure(figsize=(9, 5))
+    fig.canvas.manager.set_window_title("fps_compare")
 
     for i, fn in enumerate(files):
         n, fps = load_nf(fn)
