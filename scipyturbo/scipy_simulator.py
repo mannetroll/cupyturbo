@@ -27,9 +27,6 @@ This is now a faithful structural port of dns_all.cu:
 The 3/2 de-aliasing, Crank–Nicolson update, and spectral vorticity
 formulas follow the CUDA kernels line-by-line.
 """
-
-from __future__ import annotations
-
 from contextlib import nullcontext
 import time
 import math
@@ -241,6 +238,17 @@ class DnsState:
     seed_init: int = 1
     fft_workers: int = 1
 
+
+    # Cached FFT module (scipy.fft or cupyx.scipy.fft)
+    fft: any = None
+
+    # Precomputed grid constants for CFL computation (dx==dz==2*pi/N)
+    inv_dx: float = 0.0
+
+    # CFL scratch to avoid per-step allocations (full 3/2 grid)
+    cfl_tmp: any = None
+    cfl_absw: any = None
+
     # Time integration
     t: float = 0.0
     dt: float = 0.0
@@ -353,12 +361,22 @@ def create_dns_state(
     )
     print(f" workers: {state.fft_workers}")
 
+    # Cache FFT module for the chosen backend (avoid per-call selection)
+    state.fft = _fft_mod_for_state(state)
+
+    # Precompute inverse grid spacing (dx==dz==2*pi/N)
+    state.inv_dx = float(state.Nbase) / (2.0 * math.pi)
+
     # Allocate arrays
     state.ur = xp.zeros((NZ, NX, 3), dtype=xp.float32)
     state.uc = xp.zeros((NZ, NK, 3), dtype=xp.complex64)
 
     state.ur_full = xp.zeros((3, NZ_full, NX_full), dtype=xp.float32)
     state.uc_full = xp.zeros((3, NZ_full, NK_full), dtype=xp.complex64)
+
+    # CFL scratch buffers (full 3/2 grid) to avoid per-step temporaries
+    state.cfl_tmp = xp.empty((NZ_full, NX_full), dtype=xp.float32)
+    state.cfl_absw = xp.empty((NZ_full, NX_full), dtype=xp.float32)
 
     state.om2 = xp.zeros((NZ, NX_half), dtype=xp.complex64)
     state.fnm1 = xp.zeros((NZ, NX_half), dtype=xp.complex64)
@@ -707,13 +725,15 @@ def vfft_full_inverse_uc_full_to_ur_full(S: DnsState) -> None:
     """
     xp = S.xp
     UC = S.uc_full
-
-    fft = _fft_mod_for_state(S)
+    fft = S.fft
     if fft is None:
         raise RuntimeError("scipy.fft is not available on CPU (import scipy.fft failed).")
 
-    # irfft2 does: ifft along axis=1 and irfft along axis=2, including 1/(NZ_full*NX_full) scaling
-    ur_full = fft.irfft2(UC, s=(S.NZ_full, S.NX_full), axes=(1, 2))
+    if S.backend == "cpu":
+        # overwrite_x reduces temporary allocations on SciPy/pocketfft
+        ur_full = fft.irfft2(UC, s=(S.NZ_full, S.NX_full), axes=(1, 2), overwrite_x=True)
+    else:
+        ur_full = fft.irfft2(UC, s=(S.NZ_full, S.NX_full), axes=(1, 2))
 
     S.ur_full[...] = xp.asarray(ur_full, dtype=xp.float32)
 
@@ -730,13 +750,15 @@ def vfft_full_forward_ur_full_to_uc_full(S: DnsState) -> None:
     """
     # S.ur_full is already float32
     UR = S.ur_full
-
-    fft = _fft_mod_for_state(S)
+    fft = S.fft
     if fft is None:
         raise RuntimeError("scipy.fft is not available on CPU (import scipy.fft failed).")
 
-    # rfft2 does: rfft along last axis and fft along the other axis in axes.
-    UC = fft.rfft2(UR, s=(S.NZ_full, S.NX_full), axes=(1, 2))
+    if S.backend == "cpu":
+        # overwrite_x is safe here (UR_full is overwritten later by STEP2A anyway)
+        UC = fft.rfft2(UR, s=(S.NZ_full, S.NX_full), axes=(1, 2), overwrite_x=True)
+    else:
+        UC = fft.rfft2(UR, s=(S.NZ_full, S.NX_full), axes=(1, 2))
 
     # Assign back; uc_full is complex64, assignment will down-cast if needed
     S.uc_full[...] = UC
@@ -1087,12 +1109,16 @@ def dns_step2a(S: DnsState) -> None:
     # ----------------------------------------------------------
     # 3+4) Inverse transforms via irfft2, then scale to match CUFFT
     # ----------------------------------------------------------
-    fft = _fft_mod_for_state(S)
+    fft = S.fft
     if fft is None:
         raise RuntimeError("scipy.fft is not available on CPU (import scipy.fft failed).")
 
     # irfft2 includes 1/(NZ_full*NX_full); CUFFT inverse is unscaled
-    ur_full = fft.irfft2(UC, s=(NZ_full, NX_full), axes=(1, 2))
+    if S.backend == "cpu":
+        ur_full = fft.irfft2(UC, s=(NZ_full, NX_full), axes=(1, 2), overwrite_x=True)
+    else:
+        ur_full = fft.irfft2(UC, s=(NZ_full, NX_full), axes=(1, 2))
+
     ur_full *= (NZ_full * NX_full)
     S.ur_full[...] = ur_full
 
@@ -1119,9 +1145,10 @@ def compute_cflm(S: DnsState) -> float:
     """
     Compute CFLM = max(|u|/dx + |w|/dz) on the full 3/2 grid,
     same definition as in CUDA.
+
+    CPU optimization: reuse preallocated buffers to avoid per-step temporaries.
     """
     xp = S.xp
-    PI = math.pi
 
     NX3D2 = S.NX_full
     NZ3D2 = S.NZ_full
@@ -1129,10 +1156,15 @@ def compute_cflm(S: DnsState) -> float:
     u = S.ur_full[0, :NZ3D2, :NX3D2]
     w = S.ur_full[1, :NZ3D2, :NX3D2]
 
-    dx = 2.0 * PI / float(S.Nbase)
-    dz = dx
+    # dx == dz == 2*pi/N → (|u|/dx + |w|/dz) == (|u| + |w|) * inv_dx
+    tmp = S.cfl_tmp[:NZ3D2, :NX3D2]            # scratch plane (float32)
+    absw = S.cfl_absw[:NZ3D2, :NX3D2]           # scratch plane (float32)
 
-    CFLM = float(xp.max(xp.abs(u) / dx + xp.abs(w) / dz))
+    xp.abs(u, out=tmp)
+    xp.abs(w, out=absw)
+    xp.add(tmp, absw, out=tmp)
+
+    CFLM = float(xp.max(tmp) * S.inv_dx)
     return CFLM
 
 
@@ -1294,34 +1326,42 @@ def _spectral_band_to_phys_full_grid(S: DnsState, band) -> any:
 
     # ----------------------------------------------------------
     # Z-reshuffle low-kz strip (STEP2A-style)
-    #   for z_low = 0..N/2-1:
-    #       z_mid = z_low + N/2
-    #       z_top = z_low + N
+    #
+    # For the 3/2 grid (NZ_full = 3N/2) this is a contiguous block move:
+    #
+    #   z_mid = N/2 .. N-1
+    #   z_top = N   .. 3N/2-1
+    #
+    # and only for kx < min(N/2, NK_full).
     # ----------------------------------------------------------
     halfN = N // 2
     k_max = min(halfN, NK_full)
 
-    for z_low in range(halfN):
-        z_mid = z_low + halfN
-        z_top = z_low + N
-        if z_top >= NZ_full:
-            break
+    if k_max > 0:
+        z_mid_start = halfN
+        z_mid_end = halfN + halfN    # == N
+        z_top_start = N
+        z_top_end = N + halfN        # == 3N/2 == NZ_full
 
-        slice_mid = uc_tmp[z_mid, :k_max].copy()
-        uc_tmp[z_top, :k_max] = slice_mid
-        uc_tmp[z_mid, :k_max] = xp.complex64(0.0 + 0.0j)
+        uc_tmp[z_top_start:z_top_end, :k_max] = uc_tmp[z_mid_start:z_mid_end, :k_max]
+        uc_tmp[z_mid_start:z_mid_end, :k_max] = xp.complex64(0.0 + 0.0j)
 
-    # Zero the "middle" Fourier coefficient Z = NZ+1 (1-based)
+# Zero the "middle" Fourier coefficient Z = NZ+1 (1-based)
     z_mid = NZ  # 0-based index
     if z_mid < NZ_full:
         uc_tmp[z_mid, :NX_half] = xp.complex64(0.0 + 0.0j)
 
     # ONLY CHANGE: use irfft2 then scale to match CUFFT
-    fft = _fft_mod_for_state(S)
+    fft = S.fft
     if fft is None:
         raise RuntimeError("scipy.fft is not available on CPU (import scipy.fft failed).")
 
-    phys = fft.irfft2(uc_tmp, s=(NZ_full, NX_full), axes=(0, 1)) * (NZ_full * NX_full)
+    if S.backend == "cpu":
+        phys = fft.irfft2(uc_tmp, s=(NZ_full, NX_full), axes=(0, 1), overwrite_x=True)
+    else:
+        phys = fft.irfft2(uc_tmp, s=(NZ_full, NX_full), axes=(0, 1))
+
+    phys *= (NZ_full * NX_full)
     return xp.asarray(phys, dtype=xp.float32)
 
 

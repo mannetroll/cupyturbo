@@ -987,7 +987,7 @@ class MainWindow(QMainWindow):
 # ----------------------------------------------------------------------
 def main() -> None:
     app = QApplication(sys.argv)
-    sim = NumPyDnsSimulator(n=512)
+    sim = NumPyDnsSimulator(n=256)
     window = MainWindow(sim)
     screen = app.primaryScreen().availableGeometry()
     g = window.geometry()
