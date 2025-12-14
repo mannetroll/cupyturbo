@@ -10,7 +10,6 @@ Running N=32 ...
  requested = auto
  backend:  auto
  workers: 6
- scipy.fft workers now = 1
  N           =          32
  Reynolds n. =     10000.0
  K0          =          10
@@ -35,13 +34,14 @@ Running N=32 ...
  PAO seed    =        3138
  PAO initialization OK. VISC=0.0010583508
  effective = cpu (xp = numpy)
+ scipy.fft workers in-context = 6
  [NEXTDT INIT] CFLM=    18.6306 DT=  0.0128140 CN=  1.0000000
  Initial DT=  0.0128140 CN=  1.0000000
  ITERATION      1 T=0.0128139701 DT=0.01288009 CN=1.00515960
  ITERATION    100 T=1.2429281925 DT=0.01295491 CN=1.00510431
  ITERATION    101 T=1.2558830998 DT=0.01297650 CN=1.00166679
- Elapsed CPU time for 101 steps (s) =       0.0103
- Frames per second (FPS)                 =    9776.8346
+ Elapsed CPU time for 101 steps (s) =       0.0227
+ Frames per second (FPS)                 =    4444.1836
  Final T=1.2558830998  CN=1.0016667864  DT=0.0129765004  VISC=0.0010583508
 Running N=64 ...
  Checking CuPy...
@@ -55,7 +55,6 @@ Running N=64 ...
  requested = auto
  backend:  auto
  workers: 6
- scipy.fft workers now = 1
  N           =          64
  Reynolds n. =     10000.0
  K0          =          10
@@ -80,13 +79,14 @@ Running N=64 ...
  PAO seed    =        4921
  PAO initialization OK. VISC=0.0009968943
  effective = cpu (xp = numpy)
+ scipy.fft workers in-context = 6
  [NEXTDT INIT] CFLM=    37.7238 DT=  0.0063284 CN=  1.0000000
  Initial DT=  0.0063284 CN=  1.0000000
  ITERATION      1 T=0.0063284289 DT=0.00631925 CN=0.99854925
  ITERATION    100 T=0.5905239354 DT=0.00600211 CN=1.00367663
  ITERATION    101 T=0.5965260426 DT=0.00601782 CN=1.00261756
- Elapsed CPU time for 101 steps (s) =       0.0217
- Frames per second (FPS)                 =    4648.6294
+ Elapsed CPU time for 101 steps (s) =       0.0324
+ Frames per second (FPS)                 =    3116.7589
  Final T=0.5965260426  CN=1.0026175552  DT=0.0060178180  VISC=0.0009968943
 Running N=128 ...
  Checking CuPy...
@@ -100,7 +100,6 @@ Running N=128 ...
  requested = auto
  backend:  auto
  workers: 6
- scipy.fft workers now = 1
  N           =         128
  Reynolds n. =     10000.0
  K0          =          10
@@ -125,13 +124,14 @@ Running N=128 ...
  PAO seed    =        2115
  PAO initialization OK. VISC=0.0009968169
  effective = cpu (xp = numpy)
+ scipy.fft workers in-context = 6
  [NEXTDT INIT] CFLM=    94.9915 DT=  0.0025132 CN=  1.0000000
  Initial DT=  0.0025132 CN=  1.0000000
  ITERATION      1 T=0.0025131968 DT=0.00251280 CN=0.99984171
  ITERATION    100 T=0.2515167094 DT=0.00274625 CN=1.00391174
  ITERATION    101 T=0.2542629585 DT=0.00275737 CN=1.00404883
- Elapsed CPU time for 101 steps (s) =       0.0656
- Frames per second (FPS)                 =    1539.1629
+ Elapsed CPU time for 101 steps (s) =       0.0607
+ Frames per second (FPS)                 =    1665.0593
  Final T=0.2542629585  CN=1.0040488308  DT=0.0027573682  VISC=0.0009968169
 Running N=256 ...
  Checking CuPy...
@@ -145,7 +145,6 @@ Running N=256 ...
  requested = auto
  backend:  auto
  workers: 6
- scipy.fft workers now = 1
  N           =         256
  Reynolds n. =     10000.0
  K0          =          10
@@ -170,13 +169,14 @@ Running N=256 ...
  PAO seed    =         614
  PAO initialization OK. VISC=0.0009968169
  effective = cpu (xp = numpy)
+ scipy.fft workers in-context = 6
  [NEXTDT INIT] CFLM=   147.0106 DT=  0.0016239 CN=  1.0000000
  Initial DT=  0.0016239 CN=  1.0000000
  ITERATION      1 T=0.0016239130 DT=0.00162426 CN=1.00021490
  ITERATION    100 T=0.1668507193 DT=0.00168243 CN=0.99972888
  ITERATION    101 T=0.1685331539 DT=0.00168213 CN=0.99981898
- Elapsed CPU time for 101 steps (s) =       0.2985
- Frames per second (FPS)                 =     338.3922
+ Elapsed CPU time for 101 steps (s) =       0.2995
+ Frames per second (FPS)                 =     337.2385
  Final T=0.1685331539  CN=0.9998189768  DT=0.0016821301  VISC=0.0009968169
 Running N=512 ...
  Checking CuPy...
@@ -190,7 +190,6 @@ Running N=512 ...
  requested = auto
  backend:  auto
  workers: 6
- scipy.fft workers now = 1
  N           =         512
  Reynolds n. =     10000.0
  K0          =          10
@@ -215,13 +214,14 @@ Running N=512 ...
  PAO seed    =        1489
  PAO initialization OK. VISC=0.0009968169
  effective = cpu (xp = numpy)
+ scipy.fft workers in-context = 6
  [NEXTDT INIT] CFLM=   333.7852 DT=  0.0007152 CN=  1.0000000
  Initial DT=  0.0007152 CN=  1.0000000
  ITERATION      1 T=0.0007152278 DT=0.00071515 CN=0.99988538
  ITERATION    100 T=0.0704590929 DT=0.00069915 CN=0.99996918
  ITERATION    101 T=0.0711582381 DT=0.00069912 CN=0.99997082
- Elapsed CPU time for 101 steps (s) =       1.3738
- Frames per second (FPS)                 =      73.5174
+ Elapsed CPU time for 101 steps (s) =       0.9475
+ Frames per second (FPS)                 =     106.5984
  Final T=0.0711582381  CN=0.9999708218  DT=0.0006991249  VISC=0.0009968169
 Running N=1024 ...
  Checking CuPy...
@@ -235,7 +235,6 @@ Running N=1024 ...
  requested = auto
  backend:  auto
  workers: 6
- scipy.fft workers now = 1
  N           =        1024
  Reynolds n. =     10000.0
  K0          =          10
@@ -260,12 +259,103 @@ Running N=1024 ...
  PAO seed    =        1458
  PAO initialization OK. VISC=0.0009968169
  effective = cpu (xp = numpy)
+ scipy.fft workers in-context = 6
  [NEXTDT INIT] CFLM=   609.7739 DT=  0.0003915 CN=  1.0000000
  Initial DT=  0.0003915 CN=  1.0000000
  ITERATION      1 T=0.0003915098 DT=0.00039149 CN=0.99994882
  ITERATION    100 T=0.0386924580 DT=0.00038208 CN=0.99976324
  ITERATION    101 T=0.0390745409 DT=0.00038199 CN=0.99976618
- Elapsed CPU time for 101 steps (s) =       5.6878
- Frames per second (FPS)                 =      17.7572
+ Elapsed CPU time for 101 steps (s) =       3.2215
+ Frames per second (FPS)                 =      31.3516
  Final T=0.0390745409  CN=0.9997661776  DT=0.0003819936  VISC=0.0009968169
 Running N=2048 ...
+ Checking CuPy...
+ CuPy not installed
+--- INITIALIZING DNS_ALL PYTHON (NumPy/CuPy) ---
+ N   = 2048
+ Re  = 10000
+ K0  = 10.0
+ Steps = 101
+ CFL  = 0.75
+ requested = auto
+ backend:  auto
+ workers: 6
+ N           =        2048
+ Reynolds n. =     10000.0
+ K0          =          10
+ Energy      =      0.9968
+ WiWi        =    100.0000
+ Epsilon     =      0.0997
+ a11         =      0.0000
+ e11         =      0.0000
+ Time scale  =      5.0000
+ Kolmogorov  =      0.0100
+ Viscosity   =      0.0010
+ dx/Kol.     =      0.3073
+ 2Pi/Nlamda  =     18.7245
+ 2Pi/Lux     =     22.2496
+ 2Pi/Luz     =     38.5380
+ 2Pi/Lwx     =     38.5380
+ 2Pi/Lwz     =     22.2496
+ Deps.       =      0.0397
+ Ceps2       =      1.9936
+ E1          =      1.0000
+ E3          =      1.0000
+ PAO seed    =        4947
+ PAO initialization OK. VISC=0.0009968169
+ effective = cpu (xp = numpy)
+ scipy.fft workers in-context = 6
+ [NEXTDT INIT] CFLM=  1274.0156 DT=  0.0001874 CN=  1.0000000
+ Initial DT=  0.0001874 CN=  1.0000000
+ ITERATION      1 T=0.0001873858 DT=0.00018739 CN=0.99999626
+ ITERATION    100 T=0.0187302801 DT=0.00018734 CN=1.00002088
+ ITERATION    101 T=0.0189176175 DT=0.00018734 CN=1.00001929
+ Elapsed CPU time for 101 steps (s) =      12.0552
+ Frames per second (FPS)                 =       8.3781
+ Final T=0.0189176175  CN=1.0000192909  DT=0.0001873410  VISC=0.0009968169
+Running N=4096 ...
+ Checking CuPy...
+ CuPy not installed
+--- INITIALIZING DNS_ALL PYTHON (NumPy/CuPy) ---
+ N   = 4096
+ Re  = 10000
+ K0  = 10.0
+ Steps = 101
+ CFL  = 0.75
+ requested = auto
+ backend:  auto
+ workers: 6
+ N           =        4096
+ Reynolds n. =     10000.0
+ K0          =          10
+ Energy      =      0.9968
+ WiWi        =    100.0000
+ Epsilon     =      0.0997
+ a11         =      0.0000
+ e11         =      0.0000
+ Time scale  =      5.0000
+ Kolmogorov  =      0.0100
+ Viscosity   =      0.0010
+ dx/Kol.     =      0.1536
+ 2Pi/Nlamda  =     18.7245
+ 2Pi/Lux     =     22.2496
+ 2Pi/Luz     =     38.5380
+ 2Pi/Lwx     =     38.5380
+ 2Pi/Lwz     =     22.2496
+ Deps.       =      0.0397
+ Ceps2       =      1.9936
+ E1          =      1.0000
+ E3          =      1.0000
+ PAO seed    =        4224
+ PAO initialization OK. VISC=0.0009968169
+ effective = cpu (xp = numpy)
+ scipy.fft workers in-context = 6
+ [NEXTDT INIT] CFLM=  2389.7476 DT=  0.0000999 CN=  1.0000000
+ Initial DT=  0.0000999 CN=  1.0000000
+ ITERATION      1 T=0.0000998986 DT=0.00009990 CN=1.00000588
+ ITERATION    100 T=0.0100033795 DT=0.00010019 CN=1.00003277
+ ITERATION    101 T=0.0101035699 DT=0.00010019 CN=1.00003298
+ Elapsed CPU time for 101 steps (s) =      52.3504
+ Frames per second (FPS)                 =       1.9293
+ Final T=0.0101035699  CN=1.0000329778  DT=0.0001001937  VISC=0.0009968169
+Done. Results written to fps_sweep.csv
