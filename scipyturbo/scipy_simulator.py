@@ -30,6 +30,7 @@ formulas follow the CUDA kernels line-by-line.
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 import time
 import math
 import sys
