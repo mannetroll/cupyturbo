@@ -1431,6 +1431,18 @@ def run_dns(
     print(f" CFL  = {CFL}")
     print(f" requested = {backend}")
 
+    import os
+    workers = os.cpu_count() or 1
+    print(f" workers = {workers}")
+
+    if backend == "cpu":
+        import scipy.fft as _spfft
+        with _spfft.set_workers(workers):
+            S = create_dns_state(N=N, Re=Re, K0=K0, CFL=CFL, backend=backend)
+            # keep the rest of run_dns() EXACTLY as it is, indented inside this block
+    else:
+        S = create_dns_state(N=N, Re=Re, K0=K0, CFL=CFL, backend=backend)
+
     S = create_dns_state(N=N, Re=Re, K0=K0, CFL=CFL, backend=backend)
     print(f" effective = {S.backend} (xp = {'cupy' if S.backend == 'gpu' else 'numpy'})")
 
@@ -1497,7 +1509,7 @@ def main():
     N = int(args[0]) if len(args) > 0 else 256
     Re = float(args[1]) if len(args) > 1 else 10000
     K0 = float(args[2]) if len(args) > 2 else 10.0
-    STEPS = int(args[3]) if len(args) > 3 else 301
+    STEPS = int(args[3]) if len(args) > 3 else 501
     CFL = float(args[4]) if len(args) > 4 else 0.75
 
     # 6th arg: backend ("cpu" | "gpu" | "auto"), default "auto"

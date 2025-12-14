@@ -1,4 +1,6 @@
 # scipy_wrapper.py
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Union
 
@@ -7,6 +9,9 @@ import math
 import os
 from scipyturbo import scipy_simulator as dns_all
 from PIL import Image
+
+# --- ONLY: SciPy FFT threading control (CPU) ---
+import scipy.fft as spfft
 
 
 class NumPyDnsSimulator:
@@ -27,60 +32,72 @@ class NumPyDnsSimulator:
     VAR_OMEGA = 3
     VAR_STREAM = 4
 
-    def __init__(self, n: int = 384, re: float = 10000.0, k0: float = 10.0,  cfl: float = 0.75, seed: int = 1):
+    def __init__(
+        self,
+        n: int = 384,
+        re: float = 10000.0,
+        k0: float = 10.0,
+        cfl: float = 0.75,
+        seed: int = 1,
+    ):
         self.N = int(n)
         self.m = 3 * self.N
         self.re = float(re)
         self.k0 = float(k0)
-        self.cfl =  float(cfl)
+        self.cfl = float(cfl)
         self.seed = int(seed)
         self.max_steps = 5000
+
+        # --- ONLY: max SciPy FFT workers on CPU ---
+        self.fft_workers = os.cpu_count() or 1
+        print(f" workers = {self.fft_workers}")
 
         # UR dimensions from Fortran workspace: UR(2+3N/2, 3N/2, 3)
         # For the pure-Python solver, we use the full 3/2-grid from DnsState.
         #   ur_full has shape (3, NZ_full, NX_full)
         #   NZ_full = 3*N/2, NX_full = 3*N/2
         # We map these directly to (py, px) for the GUI.
-        self.state = dns_all.create_dns_state(
-            N=self.N,
-            Re=self.re,
-            K0=self.k0,
-            CFL=self.cfl,
-            backend="auto",   # GUI uses the CPU/NumPy/GPU/CuPy backend
-            seed=self.seed,
-        )
+        with spfft.set_workers(self.fft_workers):
+            self.state = dns_all.create_dns_state(
+                N=self.N,
+                Re=self.re,
+                K0=self.k0,
+                CFL=self.cfl,
+                backend="auto",  # GUI uses the CPU/NumPy/GPU/CuPy backend
+                seed=self.seed,
+            )
 
-        self.nx = int(self.state.NZ_full)   # "height"
-        self.ny = int(self.state.NX_full)   # "width"
+            self.nx = int(self.state.NZ_full)  # "height"
+            self.ny = int(self.state.NX_full)  # "width"
 
-        # expose for GUI sizing
-        self.py = self.nx   # height
-        self.px = self.ny   # width
+            # expose for GUI sizing
+            self.py = self.nx  # height
+            self.px = self.ny  # width
 
-        # time integration scalars
-        self.t = float(self.state.t)
-        self.dt = float(self.state.dt)
-        self.cn = float(self.state.cn)
-        self.iteration = 0
+            # time integration scalars
+            self.t = float(self.state.t)
+            self.dt = float(self.state.dt)
+            self.cn = float(self.state.cn)
+            self.iteration = 0
 
-        # which field to visualize
-        self.current_var = self.VAR_U
+            # which field to visualize
+            self.current_var = self.VAR_U
 
-        # initialize Python DNS state (mirror dns_all.run_dns NEXTDT INIT)
-        #   1) initial STEP2A from spectral to physical
-        #   2) compute CFLM
-        #   3) set DT and CN from CFL condition
-        dns_all.dns_step2a(self.state)
-        CFLM = dns_all.compute_cflm(self.state)
-        # CFLM * DT * PI = CFLNUM  →  DT = CFLNUM / (CFLM * PI)
-        self.state.dt = self.state.cflnum / (CFLM * math.pi)
-        self.state.cn = 1.0
-        self.state.cnm1 = 0.0
+            # initialize Python DNS state (mirror dns_all.run_dns NEXTDT INIT)
+            #   1) initial STEP2A from spectral to physical
+            #   2) compute CFLM
+            #   3) set DT and CN from CFL condition
+            dns_all.dns_step2a(self.state)
+            CFLM = dns_all.compute_cflm(self.state)
+            # CFLM * DT * PI = CFLNUM  →  DT = CFLNUM / (CFLM * PI)
+            self.state.dt = self.state.cflnum / (CFLM * math.pi)
+            self.state.cn = 1.0
+            self.state.cnm1 = 0.0
 
-        # mirror into the simulator scalars
-        self.t = float(self.state.t)
-        self.dt = float(self.state.dt)
-        self.cn = float(self.state.cn)
+            # mirror into the simulator scalars
+            self.t = float(self.state.t)
+            self.dt = float(self.state.dt)
+            self.cn = float(self.state.cn)
 
     # ------------------------------------------------------------------
     def step(self, mod_next_dt: int) -> None:
@@ -96,9 +113,15 @@ class NumPyDnsSimulator:
 
         dt_old = S.dt
 
-        dns_all.dns_step2b(S)
-        dns_all.dns_step3(S)
-        dns_all.dns_step2a(S)
+        if S.backend == "cpu":
+            with spfft.set_workers(self.fft_workers):
+                dns_all.dns_step2b(S)
+                dns_all.dns_step3(S)
+                dns_all.dns_step2a(S)
+        else:
+            dns_all.dns_step2b(S)
+            dns_all.dns_step3(S)
+            dns_all.dns_step2a(S)
 
         # Call NEXTDT every mod_next_dt iterations
         if (self.iteration % mod_next_dt) == 0:
@@ -117,14 +140,15 @@ class NumPyDnsSimulator:
         self.m = 3 * self.N  # preserve original structure
 
         # Rebuild state exactly the same way __init__ does
-        self.state = dns_all.create_dns_state(
-            N=self.N,
-            Re=self.re,
-            K0=self.k0,
-            CFL=self.cfl,
-            backend="auto",
-            seed=self.seed,
-        )
+        with spfft.set_workers(self.fft_workers):
+            self.state = dns_all.create_dns_state(
+                N=self.N,
+                Re=self.re,
+                K0=self.k0,
+                CFL=self.cfl,
+                backend="auto",
+                seed=self.seed,
+            )
 
         # DEBUG: print full-grid sizes
         '''
@@ -146,8 +170,14 @@ class NumPyDnsSimulator:
         self.px = self.ny
 
         # Reset integrator scalars like in reset_field()
-        dns_all.dns_step2a(self.state)
-        CFLM = dns_all.compute_cflm(self.state)
+        if self.state.backend == "cpu":
+            with spfft.set_workers(self.fft_workers):
+                dns_all.dns_step2a(self.state)
+                CFLM = dns_all.compute_cflm(self.state)
+        else:
+            dns_all.dns_step2a(self.state)
+            CFLM = dns_all.compute_cflm(self.state)
+
         self.state.dt = self.state.cflnum / (CFLM * math.pi)
         self.state.cn = 1.0
         self.state.cnm1 = 0.0
@@ -168,22 +198,29 @@ class NumPyDnsSimulator:
         seed = 1 + (int.from_bytes(os.urandom(8), "little") % 5010)
 
         # Recreate the Python DNS state and redo the NEXTDT INIT phase
-        self.state = dns_all.create_dns_state(
-            N=self.N,
-            Re=self.re,
-            K0=self.k0,
-            CFL=self.cfl,
-            backend="auto",
-            seed=seed,
-        )
+        with spfft.set_workers(self.fft_workers):
+            self.state = dns_all.create_dns_state(
+                N=self.N,
+                Re=self.re,
+                K0=self.k0,
+                CFL=self.cfl,
+                backend="auto",
+                seed=seed,
+            )
 
         self.nx = int(self.state.NZ_full)
         self.ny = int(self.state.NX_full)
         self.py = self.nx
         self.px = self.ny
 
-        dns_all.dns_step2a(self.state)
-        CFLM = dns_all.compute_cflm(self.state)
+        if self.state.backend == "cpu":
+            with spfft.set_workers(self.fft_workers):
+                dns_all.dns_step2a(self.state)
+                CFLM = dns_all.compute_cflm(self.state)
+        else:
+            dns_all.dns_step2a(self.state)
+            CFLM = dns_all.compute_cflm(self.state)
+
         self.state.dt = self.state.cflnum / (CFLM * math.pi)
         self.state.cn = 1.0
         self.state.cnm1 = 0.0
