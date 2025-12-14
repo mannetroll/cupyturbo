@@ -1,5 +1,5 @@
 """
-optimized.py — 2D Homogeneous Turbulence DNS (NumPy / CuPy port)
+scipy_simulator.py — 2D Homogeneous Turbulence DNS (NumPy / CuPy port)
 
 This is a structural port of dns_all.cu to Python.
 
@@ -270,23 +270,6 @@ class DnsState:
     step3_kx_indices: any = None
     step3_z_spec: any = None
 
-    # STEP3 scratch buffers & constants (avoid per-step allocations)
-    step3_uc1_th: any = None
-    step3_uc2_th: any = None
-    step3_uc3_th: any = None
-
-    step3_K2: any = None          # float32 (NZ, NX_half)
-    step3_GA: any = None          # float32 (NZ, NX_half)
-    step3_G2mA2: any = None       # float32 (NZ, NX_half)
-    step3_invK2_sub: any = None   # float32 (NZ, NX_half-1)
-
-    step3_ARG: any = None         # float32 (NZ, NX_half)
-    step3_DEN: any = None         # float32 (NZ, NX_half)
-    step3_NUM: any = None         # complex64 (NZ, NX_half)
-
-    step3_mask_ix0: any = None    # bool (NZ,)
-    step3_divxz: any = None       # float32 scalar
-
     def sync(self):
         """For a CuPy backend, force synchronization at convenient checkpoints."""
         if self.backend == "gpu":
@@ -385,39 +368,6 @@ def create_dns_state(
         zi,
         zi + NZ_half,
     )
-
-    # STEP3: preallocate gather buffers for UC low-k band (avoid advanced-index allocs)
-    state.step3_uc1_th = xp.empty((NZ, NX_half), dtype=xp.complex64)
-    state.step3_uc2_th = xp.empty((NZ, NX_half), dtype=xp.complex64)
-    state.step3_uc3_th = xp.empty((NZ, NX_half), dtype=xp.complex64)
-
-    # STEP3: precompute constant spectral grids (float32) used each step
-    ax = state.alfa[None, :]          # (1, NX_half)
-    gz = state.gamma[:, None]         # (NZ, 1)
-    ax2 = ax * ax
-    gz2 = gz * gz
-
-    state.step3_K2 = (ax2 + gz2).astype(xp.float32, copy=False)
-    state.step3_GA = (gz * ax).astype(xp.float32, copy=False)
-    state.step3_G2mA2 = (gz2 - ax2).astype(xp.float32, copy=False)
-
-    if NX_half > 1:
-        state.step3_invK2_sub = (xp.float32(1.0) / (state.step3_K2[:, 1:] + xp.float32(1.0e-30))).astype(xp.float32, copy=False)
-    else:
-        state.step3_invK2_sub = xp.empty((NZ, 0), dtype=xp.float32)
-
-    # STEP3: per-step float/complex scratch (avoid allocating ARG/DEN/NUM each step)
-    state.step3_ARG = xp.empty((NZ, NX_half), dtype=xp.float32)
-    state.step3_DEN = xp.empty((NZ, NX_half), dtype=xp.float32)
-    state.step3_NUM = xp.empty((NZ, NX_half), dtype=xp.complex64)
-
-    # ix=0 branch mask (Z>=2 and GAMMA!=0), constant
-    state.step3_mask_ix0 = (state.step3_z_indices >= 1) & (xp.abs(state.gamma) > 0.0)
-
-    # DIVXZ = 1/(3NX/2 * 3NZ/2), constant for fixed N
-    NX32 = xp.float32(1.5) * xp.float32(state.Nbase)
-    NZ32 = xp.float32(1.5) * xp.float32(state.Nbase)
-    state.step3_divxz = xp.float32(1.0) / (NX32 * NZ32)
 
     return state
 
@@ -899,13 +849,17 @@ def dns_step3(S: DnsState) -> None:
     # ------------------------------------------------------------------
     # Aliases to match CUDA naming
     # ------------------------------------------------------------------
-    om2 = S.om2         # (NZ, NX_half), complex64
-    fnm1 = S.fnm1       # (NZ, NX_half), complex64
-    alfa = S.alfa       # (NX_half,), float32
-    gamma = S.gamma     # (NZ,),      float32
-    uc_full = S.uc_full # (3, NZ_full, NK_full), complex64
+    om2 = S.om2        # shape (NZ, NX_half), complex64
+    fnm1 = S.fnm1       # shape (NZ, NX_half), complex64
+    alfa = S.alfa       # shape (NX_half,), float32
+    gamma = S.gamma      # shape (NZ,),      float32
+    uc_full = S.uc_full   # shape (3, NZ_full, NK_full), complex64
 
-    Nbase = int(S.Nbase)
+    Nbase = int(S.Nbase)    # CUDA S->Nbase
+    NX_full = int(S.NX_full)
+    NZ_full = int(S.NZ_full)
+    NK_full = int(S.NK_full)
+
     NX_half = Nbase // 2
     NZ = Nbase
 
@@ -916,98 +870,164 @@ def dns_step3(S: DnsState) -> None:
     cnm1 = xp.float32(S.cnm1)
 
     # ------------------------------------------------------------------
-    # 1) Update OM2 and FNM1 (nonlinear vorticity forcing)
-    #    Reuse preallocated scratch/constant grids to avoid per-step allocs.
+    # 1) Kernel 1: update OM2 and FNM1 (nonlinear vorticity forcing)
+    #    k_step3_update_om2_and_fnm1
     # ------------------------------------------------------------------
-    z_spec = S.step3_z_spec                 # (NZ,)
-    divxz = S.step3_divxz                   # float32 scalar
-    GA = S.step3_GA                         # (NZ, NX_half), float32
-    G2mA2 = S.step3_G2mA2                   # (NZ, NX_half), float32
-    K2 = S.step3_K2                         # (NZ, NX_half), float32
+    # Build 2D wavenumber grids: ax = ALFA(ix), gz = GAMMA(iz)
+    alfa_1d  = alfa.astype(xp.float32)         # (NX_half,)
+    gamma_1d = gamma.astype(xp.float32)        # (NZ,)
 
-    # Gather UC low-k band for each component into preallocated buffers:
-    #   uc_full layout: [comp, z, kx]
-    uc0_low = uc_full[0, :, :NX_half]       # (NZ_full, NX_half) view
-    uc1_low = uc_full[1, :, :NX_half]
-    uc2_low = uc_full[2, :, :NX_half]
+    ax = alfa_1d[None, :]                      # (1, NX_half)
+    gz = gamma_1d[:, None]                     # (NZ, 1)
 
-    uc1_th = S.step3_uc1_th                 # (NZ, NX_half)
-    uc2_th = S.step3_uc2_th
-    uc3_th = S.step3_uc3_th
-    xp.take(uc0_low, z_spec, axis=0, out=uc1_th)
-    xp.take(uc1_low, z_spec, axis=0, out=uc2_th)
-    xp.take(uc2_low, z_spec, axis=0, out=uc3_th)
+    A2 = ax * ax                               # (NZ, NX_half)
+    G2 = gz * gz
+    K2 = A2 + G2
 
-    # FN = (GA*(UC1-UC2) + (G2-A2)*UC3) * DIVXZ
-    # Compute into scratch1, keep fnm1 untouched until after OM2 update (needs old fnm1).
-    tmp_FN = S.scratch1                     # (NZ, NX_half), complex64
-    tmp_c = S.scratch2                      # (NZ, NX_half), complex64
-    xp.subtract(uc1_th, uc2_th, out=tmp_FN)         # UC1-UC2
-    xp.multiply(tmp_FN, GA, out=tmp_FN)             # GA*(UC1-UC2)
-    xp.multiply(uc3_th, G2mA2, out=tmp_c)           # (G2-A2)*UC3
-    xp.add(tmp_FN, tmp_c, out=tmp_FN)               # sum
-    tmp_FN *= divxz
+    # Map base z index (0..NZ-1) to z_spec for UC_full, like CUDA:
+    #   if Z <= NZ/2      => z_spec = Z-1
+    #   else              => z_spec = Z+NZ/2-1
+    NZ_half = NZ // 2
+    z_indices = S.step3_z_indices
+    z_spec = S.step3_z_spec  # shape (NZ,)
 
-    # Crank–Nicolson in spectral space (Fortran STEP3), update OM2 in-place
+    # Gather UC(X,Z_spec,1..3) from UC_full for X=0..NX/2-1
+    # uc_full layout: [comp, z, kx]
+    uc0 = uc_full[0]  # (NZ_full, NK_full)
+    uc1 = uc_full[1]
+    uc2 = uc_full[2]
+
+    kx_idx = S.step3_kx_indices          # 0..NX_half-1
+
+    # Advanced indexing: (NZ, NX_half)
+    uc1_th = uc0[z_spec[:, None], kx_idx[None, :]]
+    uc2_th = uc1[z_spec[:, None], kx_idx[None, :]]
+    uc3_th = uc2[z_spec[:, None], kx_idx[None, :]]
+
+    # DIVXZ = 1/(3NX/2 * 3NZ/2)
+    NX32 = xp.float32(1.5) * xp.float32(Nbase)
+    NZ32 = xp.float32(1.5) * xp.float32(Nbase)
+    DIVXZ = xp.float32(1.0) / (NX32 * NZ32)
+
+    GA = gz * ax                   # GAMMA*ALFA
+    G2_minus_A2 = G2 - A2
+
+    diff12 = uc1_th - uc2_th                  # UC1 - UC2
+
+    FN = (GA * diff12 + G2_minus_A2 * uc3_th) * DIVXZ  # (NZ, NX_half), complex
+
+    # Crank–Nicolson in spectral space (Fortran STEP3)
     VT = xp.float32(0.5) * visc * dt
-    ARG = S.step3_ARG                                 # (NZ, NX_half), float32
-    DEN = S.step3_DEN                                 # (NZ, NX_half), float32
-    xp.multiply(K2, VT, out=ARG)                      # ARG = VT*K2
-    xp.add(ARG, xp.float32(1.0), out=DEN)             # DEN = 1 + ARG
+    ARG = VT * K2
+    DEN = xp.float32(1.0) + ARG
 
+    c1 = xp.float32(1.0) - ARG
     c2 = xp.float32(0.5) * dt * (xp.float32(2.0) + cnm1)
     c3 = -xp.float32(0.5) * dt * cnm1
 
-    # NUM = (1-ARG)*OM2 + c2*FN + c3*FNM1
-    NUM = S.step3_NUM                                 # (NZ, NX_half), complex64
-    NUM[...] = om2                                    # NUM = OM2
-    xp.multiply(om2, ARG, out=tmp_c)                  # tmp_c = ARG*OM2
-    NUM -= tmp_c                                      # NUM = OM2 - ARG*OM2
+    om_old = om2
+    fn_old = fnm1
 
-    xp.multiply(tmp_FN, c2, out=tmp_c)                # tmp_c = c2*FN
-    NUM += tmp_c
-    xp.multiply(fnm1, c3, out=tmp_c)                  # tmp_c = c3*FNM1_old
-    NUM += tmp_c
+    num = c1 * om_old + c2 * FN + c3 * fn_old
+    om_new = num / DEN
 
-    xp.divide(NUM, DEN, out=om2)                      # OM2_new in-place
-
-    # Store FN into FNM1 (overwriting old history)
-    fnm1[...] = tmp_FN
+    # Store back
+    S.om2 = om_new
+    S.fnm1 = FN
 
     # ------------------------------------------------------------------
-    # 2) Reconstruct UC low-k band from OM2 (spectral velocity reconstruction)
-    #    Reuse scratch1/scratch2 as out buffers.
+    # 2) Kernel 2: update UC from OM2 (spectral velocity reconstruction)
+    #    k_step3_update_uc_from_om2
     # ------------------------------------------------------------------
+    om = S.om2  # updated vorticity, shape (NZ, NX_half)
+
+    # Prepare output buffers for low-k band UC(.,Z,1:2)
     out1 = S.scratch1
     out2 = S.scratch2
     out1[...] = 0
     out2[...] = 0
 
+    # Common gamma grid
+    gz2d = gamma_1d[:, None]  # (NZ, 1)
+
+    # -----------------------------
+    # X = 2..NX/2  (ix=1..NX_half-1)
+    # -----------------------------
     if NX_half > 1:
-        invK2_sub = S.step3_invK2_sub                 # (NZ, NX_half-1), float32
+        alfa_sub = alfa_1d[1:].reshape(1, -1)   # (1, NX_half-1)
 
-        # out1[:,1:] = -i * GAMMA * (OM2/K2)
-        out1[:, 1:] = om2[:, 1:]
-        out1[:, 1:] *= invK2_sub
-        out1[:, 1:] *= gamma[:, None]
-        out1[:, 1:] *= xp.complex64(-1.0j)
+        A2_sub = alfa_sub * alfa_sub            # (NZ, NX_half-1)
+        G2_sub = gz2d * gz2d
+        K2_sub = A2_sub + G2_sub + xp.float32(1.0e-30)
 
-        # out2[:,1:] =  i * ALFA * (OM2/K2)
-        out2[:, 1:] = om2[:, 1:]
-        out2[:, 1:] *= invK2_sub
-        out2[:, 1:] *= alfa[1:][None, :]
-        out2[:, 1:] *= xp.complex64(1.0j)
+        invK2 = xp.float32(1.0) / K2_sub
 
-    # ix=0 branch:
-    #   Z>=2: UC1 = -i*OM2/GAMMA, UC2=0
-    out1[:, 0] = 0
-    mask0 = S.step3_mask_ix0
-    out1[mask0, 0] = xp.complex64(-1.0j) * (om2[mask0, 0] / gamma[mask0])
+        w_sub = om[:, 1:]                       # (NZ, NX_half-1), complex
+
+        v_sub = w_sub * invK2                   # OM2 / K2
+
+        v_r = v_sub.real
+        v_i = v_sub.imag
+
+        # UC1 = -i * GAMMA * (OM2/K2)
+        gx = gz2d * v_r
+        gy = gz2d * v_i
+
+        # -i*(gx + i gy) = (gy, -gx)
+        out1[:, 1:].real = gy
+        out1[:, 1:].imag = -gx
+
+        # UC2 =  i * ALFA * (OM2/K2)
+        axr = alfa_sub * v_r
+        axi = alfa_sub * v_i
+
+        # i*(axr + i axi) = (-axi, axr)
+        out2[:, 1:].real = -axi
+        out2[:, 1:].imag = axr
+
+    # -----------------------------
+    # X = 1 branch (ix=0)
+    #   Z >= 2:
+    #     UC(1,Z,1) = -i*OM2(1,Z)/GAMMA(Z)
+    #     UC(1,Z,2) = 0
+    #   Z = 1:
+    #     UC(1,1,1) = 0
+    #     UC(1,1,2) = 0
+    # -----------------------------
+    w0 = om[:, 0]                 # (NZ,), complex
+    gz1d = gamma_1d                 # (NZ,)
+
+    z_idx = S.step3_z_indices
+    mask = (z_idx >= 1) & (xp.abs(gz1d) > 0.0)
+
+    # OM2 / GAMMA only where mask is true (CUDA-style conditional)
+    v0 = xp.zeros_like(w0)
+    v0[mask] = w0[mask] / gz1d[mask]
+
+    # -i * v0 = (v_im, -v_re)
+    out1[:, 0].real = xp.where(mask, v0.imag.astype(xp.float32),
+                               xp.float32(0.0))
+    out1[:, 0].imag = xp.where(mask, (-v0.real).astype(xp.float32),
+                               xp.float32(0.0))
     # out2[:,0] remains zero
 
-    # Scatter into UC_full low-k strip: z=0..NZ-1, kx=0..NX_half-1
-    uc_full[0, :NZ, :NX_half] = out1
-    uc_full[1, :NZ, :NX_half] = out2
+    # -----------------------------
+    # Scatter back into UC_full low-k band:
+    #   uc_full[0,z,kx] = out1(z,kx)
+    #   uc_full[1,z,kx] = out2(z,kx)
+    # z_spec here is simply Z-1 (0..NZ-1), as in k_step3_update_uc_from_om2.
+    # -----------------------------
+    z_spec2 = S.step3_z_indices
+    kx_idx2 = S.step3_kx_indices
+
+    uc0 = uc_full[0]
+    uc1p = uc_full[1]
+
+    uc0[z_spec2[:, None], kx_idx2[None, :]] = out1
+    uc1p[z_spec2[:, None], kx_idx2[None, :]] = out2
+
+    # Write back
+    S.uc_full = uc_full
 
     # ------------------------------------------------------------------
     # 3) CNM1 update (Fortran STEP3 does CNM1 = CN)
@@ -1088,9 +1108,8 @@ def dns_step2a(S: DnsState) -> None:
         raise RuntimeError("scipy.fft is not available on CPU (import scipy.fft failed).")
 
     # irfft2 includes 1/(NZ_full*NX_full); CUFFT inverse is unscaled
-    ur_full = fft.irfft2(UC, s=(NZ_full, NX_full), axes=(1, 2))
-    ur_full *= (NZ_full * NX_full)
-    S.ur_full[...] = ur_full
+    ur_full = fft.irfft2(UC, s=(NZ_full, NX_full), axes=(1, 2)) * (NZ_full * NX_full)
+    S.ur_full[...] = xp.asarray(ur_full, dtype=xp.float32)
 
     # ----------------------------------------------------------
     # 5) Downmap compact N×N block (centered, like
