@@ -37,7 +37,7 @@ class NumPyDnsSimulator:
         n: int = 384,
         re: float = 10000.0,
         k0: float = 25.0,
-        cfl: float = 0.75,
+        cfl: float = 0.5,
         seed: int = 1,
     ):
         self.N = int(n)
