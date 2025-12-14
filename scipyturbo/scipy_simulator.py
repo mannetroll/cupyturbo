@@ -238,6 +238,7 @@ class DnsState:
     visc: float             # viscosity
     cflnum: float           # CFL target
     seed_init: int = 1
+    fft_workers: int = 1
 
     # Time integration
     t: float = 0.0
@@ -347,7 +348,9 @@ def create_dns_state(
         visc=visc,
         cflnum=CFL,
         seed_init=int(seed),
+        fft_workers=6,
     )
+    print(f" workers: {state.fft_workers}")
 
     # Allocate arrays
     state.ur = xp.zeros((NZ, NX, 3), dtype=xp.float32)
