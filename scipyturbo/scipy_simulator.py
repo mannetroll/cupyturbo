@@ -1,5 +1,5 @@
 """
-optimized.py — 2D Homogeneous Turbulence DNS (NumPy / CuPy port)
+scipy_simulator.py — 2D Homogeneous Turbulence DNS (NumPy / CuPy port)
 
 This is a structural port of dns_all.cu to Python.
 
