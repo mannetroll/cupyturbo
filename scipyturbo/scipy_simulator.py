@@ -352,11 +352,6 @@ def create_dns_state(
     )
     print(f" workers: {state.fft_workers}")
 
-    # apply workers to SciPy FFT (CPU only)
-    if state.backend == "cpu" and _spfft is not None:
-        _spfft.set_workers(state.fft_workers)
-        print(f" scipy.fft workers now = {_spfft.get_workers()}")
-
     # Allocate arrays
     state.ur = xp.zeros((NZ, NX, 3), dtype=xp.float32)
     state.uc = xp.zeros((NZ, NK, 3), dtype=xp.complex64)
@@ -1410,57 +1405,68 @@ def run_dns(
     S = create_dns_state(N=N, Re=Re, K0=K0, CFL=CFL, backend=backend)
     print(f" effective = {S.backend} (xp = {'cupy' if S.backend == 'gpu' else 'numpy'})")
 
-    dns_step2a(S)
+    # Choose a context: SciPy FFT workers (CPU only), otherwise do nothing
+    if S.backend == "cpu" and _spfft is not None and S.fft_workers > 1:
+        fft_ctx = _spfft.set_workers(S.fft_workers)  # context manager
+    else:
+        fft_ctx = nullcontext()
 
-    # ----------------------------------------
-    # Match CUDA's NEXTDT INIT behaviour
-    # ----------------------------------------
-    CFLM = compute_cflm(S)
-    # CUDA-style initial DT: CFLM * DT * PI = CFLNUM  →  DT = CFLNUM / (CFLM * PI)
-    S.dt = S.cflnum / (CFLM * math.pi)
-    S.cn = 1.0
-    S.cnm1 = 0.0
+    with fft_ctx:
+        if _spfft is not None:
+            print(f" scipy.fft workers in-context = {_spfft.get_workers()}")
+        else:
+            print(" scipy.fft workers in-context = n/a (gpu or scipy.fft missing)")
 
-    print(f" [NEXTDT INIT] CFLM={CFLM:11.4f} DT={S.dt:11.7f} CN={S.cn:11.7f}")
-    print(f" Initial DT={S.dt:11.7f} CN={S.cn:11.7f}")
-
-    S.sync()
-    t0 = time.perf_counter()
-
-    for it in range(1, STEPS + 1):
-        S.it = it
-
-        # --- save old dt (CUDA uses this for time advance) ---
-        dt_old = S.dt
-
-        # STEP2B
-        dns_step2b(S)
-
-        # STEP3
-        dns_step3(S)
-
-        # STEP2A
         dns_step2a(S)
 
-        # NEXTDT: updates S.cn and S.dt (dt_new)
-        next_dt(S)
+        # ----------------------------------------
+        # Match CUDA's NEXTDT INIT behaviour
+        # ----------------------------------------
+        CFLM = compute_cflm(S)
+        # CUDA-style initial DT: CFLM * DT * PI = CFLNUM  →  DT = CFLNUM / (CFLM * PI)
+        S.dt = S.cflnum / (CFLM * math.pi)
+        S.cn = 1.0
+        S.cnm1 = 0.0
 
-        # Advance time with *old* dt, like CUDA/Fortran
-        S.t += dt_old
+        print(f" [NEXTDT INIT] CFLM={CFLM:11.4f} DT={S.dt:11.7f} CN={S.cn:11.7f}")
+        print(f" Initial DT={S.dt:11.7f} CN={S.cn:11.7f}")
 
-        if (it % 100) == 0 or it == 1 or it == STEPS:
-            print(f" ITERATION {it:6d} T={S.t:12.10f} DT={S.dt:10.8f} CN={S.cn:10.8f}")
+        S.sync()
+        t0 = time.perf_counter()
 
-    S.sync()
-    t1 = time.perf_counter()
+        for it in range(1, STEPS + 1):
+            S.it = it
 
-    elap = t1 - t0
-    fps = (STEPS / elap) if elap > 0 else 0.0
+            # --- save old dt (CUDA uses this for time advance) ---
+            dt_old = S.dt
 
-    print(f" Elapsed CPU time for {STEPS} steps (s) = {elap:12.4f}")
-    print(f" Frames per second (FPS)                 = {fps:12.4f}")
-    print(f" Final T={S.t:12.10f}  CN={S.cn:12.10f}  DT={S.dt:12.10f}  VISC={S.visc:12.10f}")
+            # STEP2B
+            dns_step2b(S)
 
+            # STEP3
+            dns_step3(S)
+
+            # STEP2A
+            dns_step2a(S)
+
+            # NEXTDT: updates S.cn and S.dt (dt_new)
+            next_dt(S)
+
+            # Advance time with *old* dt, like CUDA/Fortran
+            S.t += dt_old
+
+            if (it % 100) == 0 or it == 1 or it == STEPS:
+                print(f" ITERATION {it:6d} T={S.t:12.10f} DT={S.dt:10.8f} CN={S.cn:10.8f}")
+
+        S.sync()
+        t1 = time.perf_counter()
+
+        elap = t1 - t0
+        fps = (STEPS / elap) if elap > 0 else 0.0
+
+        print(f" Elapsed CPU time for {STEPS} steps (s) = {elap:12.4f}")
+        print(f" Frames per second (FPS)                 = {fps:12.4f}")
+        print(f" Final T={S.t:12.10f}  CN={S.cn:12.10f}  DT={S.dt:12.10f}  VISC={S.visc:12.10f}")
 
 def main():
     #
