@@ -1,5 +1,5 @@
 """
-scipy_simulator.py — 2D Homogeneous Turbulence DNS (NumPy / CuPy port)
+scipy_simulator.py — 2D Homogeneous Turbulence DNS (SciPy / CuPy port)
 
 This is a structural port of dns_all.cu to Python.
 
@@ -14,7 +14,7 @@ Key ideas kept from the CUDA version:
   • Time loop     : STEP2B → STEP3 → STEP2A → NEXTDT, like dns_all.cu
 
 Backends:
-  • CPU:  NumPy
+  • CPU:  SciPy
   • GPU:  CuPy (if installed); same API used via the `xp` alias.
 
 This is now a faithful structural port of dns_all.cu:
@@ -115,9 +115,9 @@ def frand(seed_list):
 # ---------------------------------------------------------------------------
 def get_xp(backend: Literal["cpu", "gpu", "auto"] = "auto"):
     """
-    backend = "gpu"  → force CuPy (error if not available)
-    backend = "cpu"  → force NumPy
-    backend = "auto" → use CuPy if available and a GPU is present, else NumPy
+    backend = "gpu"  → force CuPy cuFFT (error if not available)
+    backend = "cpu"  → force SciPy FFT
+    backend = "auto" → use CuPy if available and a GPU is present, else SciPy
     """
     # Auto-select: try GPU first
     if backend == "auto":
@@ -222,7 +222,7 @@ def dump_uc_full_csv(S: "DnsState", UC_full, comp: int):
 
 @dataclass
 class DnsState:
-    xp: any                 # numpy or cupy module
+    xp: any                 # scipy or cupy module
     backend: str            # "cpu" or "gpu"
 
     Nbase: int              # Fortran NX=NZ
@@ -431,7 +431,7 @@ def create_dns_state(
 # ---------------------------------------------------------------------------
 
 # ===============================================================
-# Python/Numpy port of dnsCudaPaoHostInit, wired into DnsState
+# Python/Numpy/Scipy port of dnsCudaPaoHostInit, wired into DnsState
 # ===============================================================
 def dns_pao_host_init(S: DnsState):
     xp = S.xp
@@ -1395,7 +1395,7 @@ def run_dns(
     CFL: float = 0.75,
     backend: Literal["cpu", "gpu", "auto"] = "auto",
 ) -> None:
-    print("--- INITIALIZING DNS_ALL PYTHON (NumPy/CuPy) ---")
+    print("--- INITIALIZING DNS_ALL PYTHON (SciPy/CuPy) ---")
     print(f" N   = {N}")
     print(f" Re  = {Re}")
     print(f" K0  = {K0}")
@@ -1404,7 +1404,7 @@ def run_dns(
     print(f" requested = {backend}")
 
     S = create_dns_state(N=N, Re=Re, K0=K0, CFL=CFL, backend=backend)
-    print(f" effective = {S.backend} (xp = {'cupy' if S.backend == 'gpu' else 'numpy'})")
+    print(f" effective = {S.backend} (xp = {'cupy' if S.backend == 'gpu' else 'scipy'})")
 
     # Choose a context: SciPy FFT workers (CPU only), otherwise do nothing
     if S.backend == "cpu" and _spfft is not None and S.fft_workers > 1:
