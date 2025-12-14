@@ -20,9 +20,9 @@ def label_from_filename(path: str) -> str:
     label_map = {
         "cuda":    "cuda (.cu) RTX 3090",
         "cupy":    "cupy (.py) RTX 3090",
-        "fortran": "fortran (.f77) Apple M1",
-        "numpy":   "numpy (.py) Apple M1",
-        "scipy":   "scipy (.py) Apple M1",
+        "fortran": "fortran (.f77) Apple M1 (OpenMP, 4 threads)",
+        "numpy":   "numpy (.py) Apple M1 (single thread)",
+        "scipy":   "scipy (.py) Apple M1 (4 workers)",
     }
 
     # exact match first, then fall back to substring match (for names like "cuda_fast", etc.)
@@ -83,7 +83,7 @@ def main() -> None:
     ax1.set_ylabel("Frames per second (FPS)")
     ax1.set_title("log-log")
     ax1.grid(True, which="both", linestyle="--", alpha=0.5)
-    ax1.legend(loc="best")
+    ax1.legend(loc="upper right")
 
     # ---- Right subplot: log-lin ----
     ax2.set_xscale("log", base=2)  # log x
@@ -92,7 +92,7 @@ def main() -> None:
     ax2.set_ylim(0, 100)
     ax2.set_title("log-lin")
     ax2.grid(True, which="both", linestyle="--", alpha=0.5)
-    ax2.legend(loc="best")
+    ax2.legend(loc="upper right")
 
     # Integer tick labels at powers of two (avoid 1eX formatting)
     if all_n_min is not None and all_n_max is not None and all_n_min > 0:
