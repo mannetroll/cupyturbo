@@ -13,30 +13,35 @@ from PyInstaller.utils.hooks import (
     collect_data_files,
 )
 
+# ---- CuPy (GPU extra) payload ----
+cupy_hiddenimports = []
+cupy_binaries = []
+cupy_datas = []
+
+# If CuPy is installed in this build environment, include its dynamic imports and DLL payload.
+cupy_hiddenimports += collect_submodules("cupy")
+cupy_hiddenimports += collect_submodules("cupyx")
+cupy_hiddenimports += collect_submodules("cupy_backends")
+
+# Missing-at-runtime module you hit earlier:
+cupy_hiddenimports += ["cupy_backends.cuda._softlink"]
+
+# DLL/PYD payloads from wheels:
+cupy_binaries += collect_dynamic_libs("cupy")
+cupy_binaries += collect_dynamic_libs("cupy_backends")
+
+# Package data that CuPy wheels sometimes use for runtime CUDA libs, etc.
+# IMPORTANT: pass these into Analysis (don't append to a.datas later).
+cupy_datas += collect_data_files("cupy", include_py_files=False)
+cupy_datas += collect_data_files("cupy_backends", include_py_files=False)
+
 a = Analysis(
     ["cupyturbo/dns_main.py"],
     pathex=["."],
-    binaries=[],
-    datas=[],
-    hiddenimports=[],
+    binaries=cupy_binaries,
+    datas=cupy_datas,
+    hiddenimports=cupy_hiddenimports,
 )
-
-# ---- CuPy (GPU extra) payload ----
-# These are commonly imported dynamically by CuPy at runtime.
-a.hiddenimports += collect_submodules("cupy")
-a.hiddenimports += collect_submodules("cupyx")
-a.hiddenimports += collect_submodules("cupy_backends")
-a.hiddenimports += [
-    "cupy_backends.cuda._softlink",  # <- your missing module
-]
-
-# Pull in packaged DLL/PYD files that ship with the CuPy wheels.
-a.binaries += collect_dynamic_libs("cupy")
-a.binaries += collect_dynamic_libs("cupy_backends")
-
-# Pull in CuPy's data payloads (wheels often include CUDA libs under package data dirs).
-a.datas += collect_data_files("cupy", include_py_files=False)
-a.datas += collect_data_files("cupy_backends", include_py_files=False)
 
 pyz = PYZ(a.pure, a.zipped_data)
 
@@ -45,7 +50,7 @@ exe = EXE(
     a.scripts,
     exclude_binaries=True,
     name="cupyturbo",
-    console=True,   # keep True while debugging; set False once it works
+    console=True,   # keep True until runtime is clean; then set False
     icon="cupyturbo/cupyturbo.ico",  # optional
 )
 
