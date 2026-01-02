@@ -1,13 +1,16 @@
 # dns_main.py
+import math
 import colorsys
 import os
 import sys
 import time
+import datetime as _dt
 from typing import Optional
 
-from PyQt6.QtCore import QSize, QTimer, Qt, QStandardPaths
-from PyQt6.QtGui import QImage, QPixmap, QFontDatabase, qRgb, QKeySequence, QShortcut
-from PyQt6.QtWidgets import (
+from pathlib import Path
+from PySide6.QtCore import QSize, QTimer, Qt, QStandardPaths
+from PySide6.QtGui import QIcon, QImage, QPixmap, QFontDatabase, qRgb, QKeySequence, QShortcut
+from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
     QWidget,
@@ -26,6 +29,8 @@ import numpy as np
 
 from cupyturbo import dns_simulator as dns_all
 from cupyturbo.dns_wrapper import NumPyDnsSimulator
+
+FUSION = "Fusion"
 
 
 # Simple helper: build a 256x3 uint8 LUT from color stops in 0..1
@@ -273,7 +278,12 @@ COLOR_MAPS = {
     "RdBu": RDBU_LUT,
 }
 
-DEFAULT_CMAP_NAME = "Magma"
+DEFAULT_CMAP_NAME = "Inferno"
+# ----------------------------------------------------------------------
+# Display normalization, reduces flicker when the underlying dynamic range
+# changes quickly.
+# ----------------------------------------------------------------------
+DISPLAY_NORM_K_STD = 2.5          # map [mu - k*sigma, mu + k*sigma] -> [0,255]
 
 # ----------------------------------------------------------------------
 # Option A: Qt Indexed8 + palette tables (avoid expanding to RGB in NumPy)
@@ -384,13 +394,17 @@ class MainWindow(QMainWindow):
         # Grid-size selector (N)
         self.n_combo = QComboBox()
         self.n_combo.setToolTip("N: Grid Size (N)")
-        self.n_combo.addItems(["128", "192", "256", "384", "512", "768", "1024", "2048", "3072", "4096"])
+        self.n_combo.addItems(
+            ["128", "192", "256", "384", "512", "768", "1024", "2048", "3072", "4096", "6144", "7776",
+             "8192", "9216", "16384", "18432", "20480", "24576", "32768"]
+        )
         self.n_combo.setCurrentText(str(self.sim.N))
 
         # Reynolds selector (Re)
         self.re_combo = QComboBox()
         self.re_combo.setToolTip("R: Reynolds Number (Re)")
-        self.re_combo.addItems(["1", "1000", "10000", "100000", "1E6", "1E9", "1E12", "1E15"])
+        self.re_combo.addItems(["10", "100", "1000", "10000", "100000", "1E6", "1E9", "1E12", "1E15",
+                                "1E18", "1E21", "1E23", "1E25"])
         self.re_combo.setCurrentText(str(int(self.sim.re)))
 
         # K0 selector
@@ -410,24 +424,36 @@ class MainWindow(QMainWindow):
         # CFL selector
         self.cfl_combo = QComboBox()
         self.cfl_combo.setToolTip("L: Controlling Δt (CFL)")
-        self.cfl_combo.addItems(["0.05", "0.15", "0.25", "0.50", "0.75", "0.95"])
+        self.cfl_combo.addItems(["0.05", "0.1", "0.15", "0.25", "0.5", "0.75", "0.95"])
         self.cfl_combo.setCurrentText(str(self.sim.cfl))
 
         # Steps selector
         self.steps_combo = QComboBox()
         self.steps_combo.setToolTip("S: Max steps before reset/stop")
-        self.steps_combo.addItems(["2000", "5000", "10000", "25000", "50000", "1E5", "1E6"])
-        self.steps_combo.setCurrentText("5000")
+        self.steps_combo.addItems(["1000", "2000", "5000", "10000", "25000", "50000", "1E5", "2E5", "3E5", "1E6", "1E7"])
+        self.steps_combo.setCurrentText("10000")
 
         # Update selector
         self.update_combo = QComboBox()
         self.update_combo.setToolTip("U: Update intervall")
-        self.update_combo.addItems(["2", "5", "10", "20", "50", "100", "1000"])
-        self.update_combo.setCurrentText("2")
+        self.update_combo.addItems(["2", "5", "10", "20", "50", "100", "1E3"])
+        self.update_combo.setCurrentText("5")
 
         self.auto_reset_checkbox = QCheckBox()
         self.auto_reset_checkbox.setToolTip("If checked, simulation auto-resets")
         self.auto_reset_checkbox.setChecked(True)
+
+        if sys.platform == "darwin":
+            from PySide6.QtWidgets import QStyleFactory
+            self.variable_combo.setStyle(QStyleFactory.create(FUSION))
+            self.cmap_combo.setStyle(QStyleFactory.create(FUSION))
+            self.n_combo.setStyle(QStyleFactory.create(FUSION))
+            self.re_combo.setStyle(QStyleFactory.create(FUSION))
+            self.k0_combo.setStyle(QStyleFactory.create(FUSION))
+            self.cfl_combo.setStyle(QStyleFactory.create(FUSION))
+            self.steps_combo.setStyle(QStyleFactory.create(FUSION))
+            self.update_combo.setStyle(QStyleFactory.create(FUSION))
+
 
         self._build_layout()
 
@@ -478,7 +504,8 @@ class MainWindow(QMainWindow):
                 pass
 
         self.setWindowTitle(f"2D Turbulence {title_backend} © Mannetroll")
-        self.resize(self.sim.px + 40, self.sim.py + 120)
+        disp_w, disp_h = self._display_size_px()
+        self.resize(disp_w + 40, disp_h + 120)
 
         # Keep-alive buffers for QImage wrappers
         self._last_pixels_rgb: Optional[np.ndarray] = None  # retained for compatibility
@@ -493,8 +520,11 @@ class MainWindow(QMainWindow):
         self.variable_combo.setCurrentIndex(3)
 
         self._update_image(self.sim.get_frame_pixels())
-        self._update_status(self.sim.get_time(), self.sim.get_iteration(), None)
+        self._update_status(self.sim.get_time(), self.sim.get_iteration(), None, None)
 
+        # set combobox data
+        self.on_steps_changed(self.steps_combo.currentText())
+        self.on_update_changed(self.update_combo.currentText())
         self.on_start_clicked()  # auto-start simulation immediately
 
     # ------------------------------------------------------------------
@@ -516,60 +546,94 @@ class MainWindow(QMainWindow):
 
         central = QWidget()
         main = QVBoxLayout(central)
+        main.setSpacing(5)
         main.addWidget(self.image_label)
 
         # First row
         row1 = QHBoxLayout()
+        row1.setContentsMargins(20, 0, 0, 0)
+        row1.setAlignment(Qt.AlignmentFlag.AlignLeft)  # pack to left
         row1.addWidget(self.start_button)
         row1.addWidget(self.stop_button)
         row1.addWidget(self.reset_button)
         row1.addWidget(self.save_button)
         row1.addWidget(self.folder_button)
+        row1.addSpacing(10)
+        row1.addWidget(self.n_combo)
+        row1.addWidget(self.variable_combo)
         row1.addWidget(self.cmap_combo)
+        row1.addWidget(self.re_combo)
+        row1.addWidget(self.k0_combo)
+        row1.addWidget(self.cfl_combo)
         row1.addWidget(self.steps_combo)
-        row1.addWidget(self.update_combo)
         row1.addWidget(self.auto_reset_checkbox)
-
-        # Second row
-        row2 = QHBoxLayout()
-        row2.addWidget(self.variable_combo)
-        row2.addWidget(self.n_combo)
-        row2.addWidget(self.re_combo)
-        row2.addWidget(self.k0_combo)
-        row2.addWidget(self.cfl_combo)
-
-        # Combine into the single row if large N
-        if self.sim.N >= 1024:
-            single = QHBoxLayout()
-            self.move_widgets(row1, single)
-            self.move_widgets(row2, single)
-            main.addLayout(single)
-        else:
-            main.addLayout(row1)
-            main.addLayout(row2)
+        row1.addSpacing(10)
+        row1.addWidget(self.update_combo)
+        main.addLayout(row1)
 
         self.setCentralWidget(central)
 
-    def _maybe_downscale_u8(self, pix: np.ndarray) -> np.ndarray:
+    def _display_scale(self) -> float:
         """
-        Downscale a 2D uint8 image for display only.
-        Uses striding (nearest) to be very fast and avoid float work.
+        Must match _upscale_downscale_u8() scale logic.
+
+        Convention (based on your existing mapping code):
+          - scale < 1.0  => upscale by (1/scale) (integer)
+          - scale > 1.0  => downscale by scale   (integer)
+
+        Goal: displayed_size ~= N / down <= max_h   (for big N)
+              displayed_size ~= N * up  <= max_h   (for small N)
         """
-        N = self.sim.N
+        N = int(self.sim.N)
 
-        if N < 768:
-            scale = 1
-        elif N <= 1024:
-            scale = 2
-        elif N <= 3072:
-            scale = 4
-        else:
-            scale = 6
+        # MacBook Pro window height you mentioned:
+        screen_h = 1024
 
-        if scale == 1:
+        # Leave room for top buttons, status bar, margins, etc.
+        # Tune this once if you want it a bit larger/smaller on screen.
+        ui_margin = 320
+        max_h = max(128, screen_h - ui_margin)
+
+        if N >= max_h:
+            down = int(math.ceil(N / max_h))  # integer downscale so N/down <= max_h
+            return float(down)
+
+        up = int(math.floor(max_h / N))  # integer upscale so N*up <= max_h
+        if up < 1:
+            up = 1
+        return 1.0 / float(up)
+
+    def _display_size_px(self) -> tuple[int, int]:
+        scale = self._display_scale()
+        w0 = int(self.sim.px)
+        h0 = int(self.sim.py)
+
+        if scale == 1.0:
+            return w0, h0
+
+        if scale < 1.0:
+            up = int(round(1.0 / scale))
+            return w0 * up, h0 * up
+
+        s = int(scale)
+        return max(1, w0 // s), max(1, h0 // s)
+
+    def _upscale_downscale_u8(self, pix: np.ndarray) -> np.ndarray:
+        """
+        Downscale (or upscale for small N) a 2D uint8 image for display only.
+        Uses striding (nearest) / repeats to be very fast and avoid float work.
+        """
+        scale = self._display_scale()
+
+        if scale == 1.0:
             return np.ascontiguousarray(pix)
 
-        return np.ascontiguousarray(pix[::scale, ::scale])
+        if scale < 1.0:
+            up = int(round(1.0 / scale))  # 0.5 -> 2, 0.25 -> 4
+            return np.ascontiguousarray(np.repeat(np.repeat(pix, up, axis=0), up, axis=1))
+
+        s = int(scale)  # 2,4,6,...
+        return np.ascontiguousarray(pix[::s, ::s])
 
     def _get_full_field(self, variable: str) -> np.ndarray:
         """
@@ -637,13 +701,13 @@ class MainWindow(QMainWindow):
         self._update_image(pixels)
         t = self.sim.get_time()
         it = self.sim.get_iteration()
-        self._update_status(t, it, fps=None)
+        self._update_status(t, it, None, None)
 
     def on_reset_clicked(self) -> None:
         self.on_stop_clicked()
         self.sim.reset_field()
         self._update_image(self.sim.get_frame_pixels())
-        self._update_status(self.sim.get_time(), self.sim.get_iteration(), None)
+        self._update_status(self.sim.get_time(), self.sim.get_iteration(), None, None)
         self.on_start_clicked()
 
     @staticmethod
@@ -813,14 +877,17 @@ class MainWindow(QMainWindow):
             now = time.time()
             elapsed = now - self._sim_start_time
             steps = self.sim.get_iteration() - self._sim_start_iter
+
             fps = None
+            mspf = None
             if elapsed > 0 and steps > 0:
                 fps = steps / elapsed
+                mspf = 1000.0 * (elapsed / steps)
 
             self._update_status(
                 self.sim.get_time(),
                 self.sim.get_iteration(),
-                fps,
+                fps, mspf
             )
 
             self._status_update_counter = 0
@@ -860,19 +927,26 @@ class MainWindow(QMainWindow):
             f.write(pix.tobytes())
 
     def _update_image(self, pixels: np.ndarray) -> None:
-        """
-        Display H×W uint8 pixels using Qt Indexed8 + color table.
-        Avoids expanding to H×W×3 RGB in NumPy.
-        """
         pixels = np.asarray(pixels, dtype=np.uint8)
         if pixels.ndim != 2:
             return
 
-        pixels = self._maybe_downscale_u8(pixels)
-        h, w = pixels.shape
+        # Reduce display flicker by using a stable (EMA) mean/std
+        # normalization instead of frame-wise min/max stretching.
+        pix_f = pixels.astype(np.float32, copy=False)
+        mu = float(pix_f.mean())
+        sig = float(pix_f.std())
+        if sig < 1.0e-6:
+            sig = 1.0
 
-        # Keep numpy buffer alive for QImage
-        self._last_pixels_u8 = pixels
+        k = float(DISPLAY_NORM_K_STD)
+        lo = mu - k * sig
+        hi = mu + k * sig
+        inv = 255.0 / (hi - lo) if (hi - lo) != 0.0 else 0.0
+        pixels = ((pix_f - lo) * inv).round().clip(0.0, 255.0).astype(np.uint8)
+
+        pixels = self._upscale_downscale_u8(pixels)
+        h, w = pixels.shape
 
         qimg = QImage(
             pixels.data,
@@ -888,31 +962,21 @@ class MainWindow(QMainWindow):
         pix = QPixmap.fromImage(qimg, Qt.ImageConversionFlag.NoFormatConversion)
         self.image_label.setPixmap(pix)
 
-    def _update_status(self, t: float, it: int, fps: Optional[float]) -> None:
-        fps_str = f"{fps:4.1f}" if fps is not None else " N/a"
+    def _update_status(self, t: float, it: int, fps: Optional[float], mspf: Optional[float]) -> None:
+        fps_str = f"{fps:5.2f}" if fps is not None else " N/A"
+        mspf_str = f"{mspf:6.1f}" if mspf is not None else " N/A"
 
         # DPP = Display Pixel Percentage
-        N = self.sim.N
-        if N < 768:
-            dpp = 100  # 1× scale
-        elif N <= 1024:
-            dpp = 50  # 2× downscale
-        elif N <= 3072:
-            dpp = 25  # 4× downscale
-        else:
-            dpp = 17  # 6× downscale (≈16.7%)
+        dpp = int(100 / self._display_scale())
 
-        # elapsed wall time since sim start (minutes)
         elapsed_min = (time.time() - self._sim_start_time) / 60.0
-
-        # Viscosity from DNS state
         visc = float(self.sim.state.visc)
+        dt = float(self.sim.state.dt)
 
         txt = (
-            f"FPS: {fps_str} | Iter: {it:5d} | T: {t:6.3f} "
-            f"| DPP: {dpp}% | {elapsed_min:4.1f} min | Visc: {visc:12.10f}"
+            f"FPS: {fps_str} | MSPF: {mspf_str} | Iter: {it:5d} | T: {t:6.3f} | dt: {dt:.6f} "
+            f"| DPP: {dpp}% | {elapsed_min:4.1f} min | Visc: {visc:6g} | {_dt.datetime.now().strftime("%Y-%m-%d %H:%M")}"
         )
-
         self.status.showMessage(txt)
 
     # ------------------------------------------------------------------
@@ -981,7 +1045,13 @@ class MainWindow(QMainWindow):
 # ----------------------------------------------------------------------
 def main() -> None:
     app = QApplication(sys.argv)
+
+    icon_path = Path(__file__).with_name("scipyturbo.icns")
+    icon = QIcon(str(icon_path))
+    app.setWindowIcon(icon)
+
     sim = NumPyDnsSimulator(n=256)
+    sim.step(1)
     window = MainWindow(sim)
     screen = app.primaryScreen().availableGeometry()
     g = window.geometry()

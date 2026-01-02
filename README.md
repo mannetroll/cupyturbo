@@ -1,7 +1,7 @@
 # cupyturbo — 2D Turbulence Simulation (NumPy / CuPy)
 
-`cupyturbo` is a small playground Direct Numerical Simulation (DNS) code for 
-**2D Homogeneous, Incompressible Turbulence**, structurally ported from a legacy FORTRAN 77 implementation.
+Direct Numerical Simulation (DNS) code for 
+**2D Homogeneous, Incompressible Turbulence**
 
 It supports:
 
@@ -136,27 +136,12 @@ For a terminal-only summary:
     scalene --cli --cpu -m cupyturbo.dns_simulator 256 10000 10 201 0.75 cpu
 
 
-## Project layout (key modules)
-
-- `cupyturbo/dns_main.py`  
-  PyQt6 GUI viewer; displays DNS fields (U, V, ω, kinetic) in real time.
-
-- `cupyturbo/dns_simulator.py`  
-  Headless CLI DNS solver:
-  - PAO initialization (dns_pao_host_init)
-  - FFT helpers (vfft_full_*)
-  - STEP2A, STEP2B, STEP3
-  - CFL-based time-step control (compute_cflm, next_dt)
-
-- `cupyturbo/dns_wrapper.py`  
-  Thin wrapper for programmatic use.
-
 ## one-liner
 
 ```
 curl -LsSf https://astral.sh/uv/install.sh | sh
 uv cache clean mannetroll-cupyturbo
-uv run --python 3.13 --with mannetroll-cupyturbo==0.1.4 python -m cupyturbo.dns_main
+uv run --python 3.13 --with mannetroll-cupyturbo==0.1.5 python -m cupyturbo.dns_main
 ```
 
 ## License

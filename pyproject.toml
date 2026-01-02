@@ -1,6 +1,6 @@
 [project]
 name = "mannetroll-cupyturbo"
-version = "0.1.4"
+version = "0.1.5"
 description = "2D DNS turbulence simulator (NumPy + CuPy)"
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
@@ -11,19 +11,17 @@ authors = [
 ]
 
 dependencies = [
-    "numpy>=2.0.0",
-    "pillow>=10.0",
-    "PyQt6>=6.7",
-    "scipy>=1.16.3",
+  "numpy>=2.4,<3",
+  "Pillow>=12,<13",
+  "PySide6>=6.10.1,<7",
 ]
-
-#
-# uv pip install -U PyQt6 PyQt6-Qt6 PyQt6-sip
-#
 
 # Optional GPU extra
 [project.optional-dependencies]
-cuda = ["cupy-cuda13x>=13.6.0"]
+cuda = [
+  "cupy-cuda13x>=13.6.0",
+  "fastrlock>=0.8",
+]
 
 [project.scripts]
 cupyturbo = "cupyturbo.dns_main:main"
