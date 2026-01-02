@@ -22,6 +22,7 @@ cupy_datas = []
 cupy_hiddenimports += collect_submodules("cupy")
 cupy_hiddenimports += collect_submodules("cupyx")
 cupy_hiddenimports += collect_submodules("cupy_backends")
+cupy_hiddenimports += ["fastrlock"]
 
 # Missing-at-runtime module you hit earlier:
 cupy_hiddenimports += ["cupy_backends.cuda._softlink"]
@@ -29,6 +30,7 @@ cupy_hiddenimports += ["cupy_backends.cuda._softlink"]
 # DLL/PYD payloads from wheels:
 cupy_binaries += collect_dynamic_libs("cupy")
 cupy_binaries += collect_dynamic_libs("cupy_backends")
+cupy_binaries += collect_dynamic_libs("fastrlock")
 
 # Package data that CuPy wheels sometimes use for runtime CUDA libs, etc.
 # IMPORTANT: pass these into Analysis (don't append to a.datas later).
