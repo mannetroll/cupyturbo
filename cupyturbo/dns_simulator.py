@@ -46,8 +46,10 @@ except Exception:  # CuPy is optional
     _cp = None
     print(" CuPy not installed")
 
-import numpy as np  # in addition to your existing _np alias, this is fine
+# Cache for CUDA usability probing (None=unknown).
+_CUPY_USABLE = None
 
+import numpy as np  # in addition to your existing _np alias, this is fine
 
 # ===============================================================
 # Fortran-style random generator used in PAO (port of frand)
@@ -76,29 +78,58 @@ def frand(seed_list):
 # Backend selection: xp = np (CPU) or cp (GPU, if available)
 # ---------------------------------------------------------------------------
 
+def _cupy_is_usable() -> bool:
+    """
+    Returns True if CuPy is importable *and* the CUDA runtime/driver setup looks usable.
+
+    Conservative for frozen (PyInstaller) "lean" builds:
+      - Missing CUDA DLLs → False
+      - Driver missing/too old (cudaErrorInsufficientDriver) → False
+      - No CUDA devices → False
+    """
+    global _CUPY_USABLE
+
+    if _CUPY_USABLE is not None:
+        return bool(_CUPY_USABLE)
+
+    if _cp is None:
+        _CUPY_USABLE = False
+        return False
+
+    try:
+        ndev = int(_cp.cuda.runtime.getDeviceCount())
+        _CUPY_USABLE = (ndev > 0)
+    except Exception:
+        _CUPY_USABLE = False
+
+    return bool(_CUPY_USABLE)
+
+
 def get_xp(backend: Literal["cpu", "gpu", "auto"] = "auto"):
     """
-    backend = "gpu"  → force CuPy (error if not available)
+    backend = "gpu"  → force CuPy (error if not available/usable)
     backend = "cpu"  → force NumPy
-    backend = "auto" → use CuPy if available and a GPU is present, else NumPy
+    backend = "auto" → use CuPy only if it is usable, else NumPy
     """
-    # Auto-select: try GPU first
+    # Auto-select: try GPU first, but *only* if usable.
     if backend == "auto":
-        if _cp is not None:
+        if _cupy_is_usable():
             return _cp
         return _np
 
-    # Explicit GPU / CPU selection
     if backend == "gpu":
         if _cp is None:
             raise RuntimeError("CuPy is not installed, but backend='gpu' was requested.")
+        if not _cupy_is_usable():
+            raise RuntimeError(
+                "CuPy is installed, but CUDA is not usable on this machine "
+                "(missing CUDA runtime DLLs, no GPU, or insufficient driver)."
+            )
         return _cp
 
-    # backend == "cpu"
+    # CPU forced
     return _np
 
-
-# ---------------------------------------------------------------------------
 # Fortran-style random generator used in PAO, port of frand(seed)
 # ---------------------------------------------------------------------------
 
