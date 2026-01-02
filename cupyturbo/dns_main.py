@@ -1046,7 +1046,7 @@ class MainWindow(QMainWindow):
 def main() -> None:
     app = QApplication(sys.argv)
 
-    icon_path = Path(__file__).with_name("scipyturbo.icns")
+    icon_path = Path(__file__).with_name("cupyturbo.icns")
     icon = QIcon(str(icon_path))
     app.setWindowIcon(icon)
 
