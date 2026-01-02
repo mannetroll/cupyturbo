@@ -1,4 +1,4 @@
-# win32.spec
+# win32_lean.spec
 # Build (PowerShell):
 #   Remove-Item -Recurse -Force build,dist -ErrorAction SilentlyContinue
 #   uv sync --extra cuda
@@ -10,6 +10,7 @@
 # NOTE (runtime requirement):
 #   The target machine must have a CUDA runtime/toolkit installed and discoverable via PATH
 #   (typically %CUDA_PATH%\bin). Otherwise CuPy will fail to import.
+# win32_lean.spec (lean CUDA: rely on system CUDA DLLs)
 
 import os
 from PyInstaller.utils.hooks import (
@@ -18,34 +19,31 @@ from PyInstaller.utils.hooks import (
     collect_data_files,
 )
 
-def _filter_out_cuda_runtime_dlls(binaries):
-    """
-    Remove large CUDA runtime DLLs that CuPy wheels often bundle, so we rely on
-    system-installed CUDA instead. This dramatically reduces dist size.
-    """
-    # Case-insensitive prefix match against DLL basename.
-    exclude_prefixes = (
-        "cublas",      # cublas64_*.dll, cublasLt64_*.dll
-        "cufft",       # cufft64_*.dll
-        "curand",      # curand64_*.dll
-        "cusolver",    # cusolver64_*.dll
-        "cusparse",    # cusparse64_*.dll
-        "nvrtc",       # nvrtc64_*.dll
-        "cudart",      # cudart64_*.dll (small but still part of CUDA runtime)
-        "cudnn",       # cudnn*.dll (if present)
-        "cutensor",    # cutensor*.dll (if present)
-        "nccl",        # nccl*.dll (if present)
-        "nvjitlink",   # nvJitLink*.dll (if present)
-    )
+EXCLUDE_DLL_PREFIXES = (
+    "cublas", "cufft", "curand", "cusolver", "cusparse",
+    "nvrtc", "cudart", "cudnn", "cutensor", "nccl", "nvjitlink",
+)
 
+def _is_excluded_dll_name(name: str) -> bool:
+    base = os.path.basename(name).lower()
+    return base.endswith(".dll") and base.startswith(EXCLUDE_DLL_PREFIXES)
+
+def _filter_toc_3(toc3):
+    # Entries: (dest_name, src_name, typecode)
     out = []
-    for entry in binaries:
-        # PyInstaller binaries entries are typically: (dest_name, src_name, typecode)
-        dest_name, src_name, typecode = entry
-        base = os.path.basename(src_name).lower()
-        if base.endswith(".dll") and base.startswith(exclude_prefixes):
+    for dest, src, typ in toc3:
+        if _is_excluded_dll_name(src) or _is_excluded_dll_name(dest):
             continue
-        out.append(entry)
+        out.append((dest, src, typ))
+    return out
+
+def _filter_datas_2(datas2):
+    # Entries: (src, dest)
+    out = []
+    for src, dest in datas2:
+        if _is_excluded_dll_name(src) or _is_excluded_dll_name(dest):
+            continue
+        out.append((src, dest))
     return out
 
 
@@ -54,28 +52,25 @@ cupy_hiddenimports = []
 cupy_binaries = []
 cupy_datas = []
 
-# CuPy dynamic imports
 cupy_hiddenimports += collect_submodules("cupy")
 cupy_hiddenimports += collect_submodules("cupyx")
 cupy_hiddenimports += collect_submodules("cupy_backends")
 cupy_hiddenimports += ["cupy_backends.cuda._softlink"]
 
-# fastrlock (CuPy dependency)
+# fastrlock
 cupy_hiddenimports += collect_submodules("fastrlock")
 cupy_hiddenimports += ["fastrlock.rlock"]
 cupy_datas += collect_data_files("fastrlock", include_py_files=False)
 cupy_binaries += collect_dynamic_libs("fastrlock")
 
-# CuPy binaries (wheel payload)
+# CuPy binaries from wheels (we'll still filter later, but keep these for .pyd etc.)
 cupy_binaries += collect_dynamic_libs("cupy")
 cupy_binaries += collect_dynamic_libs("cupy_backends")
 
-# Drop bundled CUDA runtime DLLs to shrink distribution
-cupy_binaries = _filter_out_cuda_runtime_dlls(cupy_binaries)
-
-# CuPy data payloads
+# CuPy data payloads (filter out any DLLs that sneak in as "data")
 cupy_datas += collect_data_files("cupy", include_py_files=False)
 cupy_datas += collect_data_files("cupy_backends", include_py_files=False)
+cupy_datas = _filter_datas_2(cupy_datas)
 
 a = Analysis(
     ["cupyturbo/dns_main.py"],
@@ -92,14 +87,18 @@ exe = EXE(
     a.scripts,
     exclude_binaries=True,
     name="cupyturbo",
-    console=True,   # set False when you’re done debugging
+    console=True,
     icon="cupyturbo/cupyturbo.ico",
 )
 
+# CRITICAL: filter the *final* TOCs (these include auto-collected DLL deps)
+filtered_binaries = _filter_toc_3(a.binaries)
+filtered_datas = _filter_toc_3(a.datas)
+
 coll = COLLECT(
     exe,
-    a.binaries,
+    filtered_binaries,
     a.zipfiles,
-    a.datas,
+    filtered_datas,
     name="cupyturbo",
 )
