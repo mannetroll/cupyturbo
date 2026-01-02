@@ -788,10 +788,19 @@ def dns_step2b(S: DnsState) -> None:
     # ------------------------------------------------------------------
     # 2) Full-grid forward FFT: UR_full → UC_full (3 components)
     #
-    # CUDA version calls:
-    #   vfft_full_forward_ur_full_to_uc_full(S)
+    # STEP2B OPTIMIZATION (CPU/NumPy):
+    #   Do per-component 2D FFT (rfft along X, fft along Z) to avoid creating
+    #   large intermediate 3-component temporary arrays.
+    #   GPU/CuPy keeps the original path.
     # ------------------------------------------------------------------
-    vfft_full_forward_ur_full_to_uc_full(S)
+    if S.backend == "cpu":
+        # UR[comp] is (NZ_full, NX_full): axis=1 is X, axis=0 is Z
+        for comp in range(3):
+            tmp = xp.fft.rfft(UR[comp], axis=1)      # (NZ_full, NK_full)
+            UC[comp, :, :] = xp.fft.fft(tmp, axis=0) # (NZ_full, NK_full)
+    else:
+        # CUDA path (unchanged)
+        vfft_full_forward_ur_full_to_uc_full(S)
 
     # ------------------------------------------------------------------
     # 3) Zero the "middle" Fourier coefficient UC(X,NZ+1,I)
@@ -1364,20 +1373,9 @@ def _spectral_band_to_phys_full_grid(S: DnsState, band) -> any:
 def dns_om2_phys(S: DnsState) -> None:
     """
     Fill S.ur_full[2, :, :] with the physical vorticity ω(x,z).
-
-    Fortran OM2PHYS does:
-      - insert OM2 into UC(:,:,3)
-      - de-alias + reshuffle
-      - VCFFTB + VRFFTB → UR(:,:,3)
-
-    Here we:
-      - start from S.om2 (shape NZ × NX/2)
-      - map that spectral band to a full 3/2-grid physical field
-      - store in S.ur_full[2, :, :]
     """
     xp = S.xp
 
-    # S.om2 has shape (NZ, NX_half) with NZ = Nbase
     band = S.om2
     phys = _spectral_band_to_phys_full_grid(S, band)
 
@@ -1387,18 +1385,6 @@ def dns_om2_phys(S: DnsState) -> None:
 def dns_stream_func(S: DnsState) -> None:
     """
     Fill S.ur_full[2, :, :] with the streamfunction φ(x,z).
-
-    Fortran STREAMFUNC does:
-      - φ̂(X,Z) = OM2(X,Z) / (ALFA(X)^2 + GAMMA(Z)^2 + 1e-30)
-      - insert φ̂ into UC(:,:,4)
-      - de-alias + reshuffle
-      - inverse 2D FFT → UR(:,:,4)
-
-    Here we:
-      - build K2 on the compact grid (NZ × NX/2)
-      - φ̂ = OM2 / (K2 + 1e-30)
-      - map φ̂ via the same spectral → physical helper
-      - store result in S.ur_full[2, :, :].
     """
     xp = S.xp
 
@@ -1406,20 +1392,17 @@ def dns_stream_func(S: DnsState) -> None:
     NX_half = N // 2
     NZ      = N
 
-    # 1D wavenumber vectors
     alfa_1d  = S.alfa.astype(xp.float32)   # (NX_half,)
     gamma_1d = S.gamma.astype(xp.float32)  # (NZ,)
 
     ax = alfa_1d[None, :]                  # (1, NX_half)
     gz = gamma_1d[:, None]                 # (NZ, 1)
 
-    K2 = ax * ax + gz * gz                 # (NZ, NX_half)
-    K2 = K2 + xp.float32(1.0e-30)          # avoid divide-by-zero
+    K2 = ax * ax + gz * gz
+    K2 = K2 + xp.float32(1.0e-30)
 
-    # Spectral streamfunction φ̂
-    phi_hat = S.om2 / K2                   # (NZ, NX_half), complex
+    phi_hat = S.om2 / K2
 
-    # Map to physical 3/2 grid and store in ur_full[2]
     phys = _spectral_band_to_phys_full_grid(S, phi_hat)
     S.ur_full[2, :, :] = phys
 
@@ -1451,7 +1434,6 @@ def run_dns(
     # Match CUDA's NEXTDT INIT behaviour
     # ----------------------------------------
     CFLM = compute_cflm(S)
-    # CUDA-style initial DT: CFLM * DT * PI = CFLNUM  →  DT = CFLNUM / (CFLM * PI)
     S.dt = S.cflnum / (CFLM * math.pi)
     S.cn = 1.0
     S.cnm1 = 0.0
@@ -1464,22 +1446,13 @@ def run_dns(
     for it in range(1, STEPS + 1):
         S.it = it
 
-        # --- save old dt (CUDA uses this for time advance) ---
         dt_old = S.dt
 
-        # STEP2B
         dns_step2b(S)
-
-        # STEP3
         dns_step3(S)
-
-        # STEP2A
         dns_step2a(S)
-
-        # NEXTDT: updates S.cn and S.dt (dt_new)
         next_dt(S)
 
-        # Advance time with *old* dt, like CUDA/Fortran
         S.t += dt_old
 
         if (it % 100) == 0 or it == 1 or it == STEPS:
@@ -1500,10 +1473,6 @@ def run_dns(
 
 
 def main():
-    #
-    #   dns_all N Re K0 STEPS CFL auto
-    #   $ python dns_simulator.py 256 10000 10 301 0.75 cpu
-    #
     args = sys.argv[1:]
     N = int(args[0]) if len(args) > 0 else 256
     Re = float(args[1]) if len(args) > 1 else 10000
@@ -1511,7 +1480,6 @@ def main():
     STEPS = int(args[3]) if len(args) > 3 else 201
     CFL = float(args[4]) if len(args) > 4 else 0.75
 
-    # 6th arg: backend ("cpu" | "gpu" | "auto"), default "auto"
     BACK = args[5].lower() if len(args) > 5 else "auto"
     if BACK not in ("cpu", "gpu", "auto"):
         BACK = "auto"
