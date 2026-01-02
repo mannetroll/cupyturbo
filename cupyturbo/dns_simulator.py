@@ -48,14 +48,6 @@ except Exception:  # CuPy is optional
 
 import numpy as np  # in addition to your existing _np alias, this is fine
 
-def check_cupy():
-    try:
-        print(" Checking CuPy...")
-        import cupy as _cp
-        _cp.show_config()
-    except Exception:  # CuPy is optional
-        _cp = None
-        print(" CuPy not installed")
 
 # ===============================================================
 # Fortran-style random generator used in PAO (port of frand)
