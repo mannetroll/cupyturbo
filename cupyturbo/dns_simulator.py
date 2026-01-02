@@ -42,7 +42,7 @@ try:
     print(" Checking CuPy...")
     import cupy as _cp
     _cp.show_config()
-except ImportError:  # CuPy is optional
+except Exception:  # CuPy is optional
     _cp = None
     print(" CuPy not installed")
 
@@ -53,7 +53,7 @@ def check_cupy():
         print(" Checking CuPy...")
         import cupy as _cp
         _cp.show_config()
-    except ImportError:  # CuPy is optional
+    except Exception:  # CuPy is optional
         _cp = None
         print(" CuPy not installed")
 
