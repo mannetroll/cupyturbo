@@ -18,22 +18,22 @@ cupy_hiddenimports = []
 cupy_binaries = []
 cupy_datas = []
 
-# If CuPy is installed in this build environment, include its dynamic imports and DLL payload.
 cupy_hiddenimports += collect_submodules("cupy")
 cupy_hiddenimports += collect_submodules("cupyx")
 cupy_hiddenimports += collect_submodules("cupy_backends")
-cupy_hiddenimports += ["fastrlock"]
 
-# Missing-at-runtime module you hit earlier:
+# ---- FIX: include fastrlock fully ----
+cupy_hiddenimports += collect_submodules("fastrlock")
+cupy_hiddenimports += ["fastrlock.rlock"]  # explicit, belt+braces
+cupy_datas += collect_data_files("fastrlock", include_py_files=False)
+cupy_binaries += collect_dynamic_libs("fastrlock")
+# -------------------------------------
+
 cupy_hiddenimports += ["cupy_backends.cuda._softlink"]
 
-# DLL/PYD payloads from wheels:
 cupy_binaries += collect_dynamic_libs("cupy")
 cupy_binaries += collect_dynamic_libs("cupy_backends")
-cupy_binaries += collect_dynamic_libs("fastrlock")
 
-# Package data that CuPy wheels sometimes use for runtime CUDA libs, etc.
-# IMPORTANT: pass these into Analysis (don't append to a.datas later).
 cupy_datas += collect_data_files("cupy", include_py_files=False)
 cupy_datas += collect_data_files("cupy_backends", include_py_files=False)
 
@@ -53,7 +53,7 @@ exe = EXE(
     exclude_binaries=True,
     name="cupyturbo",
     console=True,   # keep True until runtime is clean; then set False
-    icon="cupyturbo/cupyturbo.ico",  # optional
+    icon="cupyturbo/cupyturbo.ico",
 )
 
 coll = COLLECT(
