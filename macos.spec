@@ -3,6 +3,7 @@
 #   rm -rf build dist
 #   uv run pyinstaller macos.spec
 #   ./dist/cupyturbo.app/Contents/MacOS/cupyturbo
+#   open -n ./dist/cupyturbo.app
 #
 
 a = Analysis(
@@ -20,7 +21,7 @@ exe = EXE(
     a.scripts,
     exclude_binaries=True,
     name="cupyturbo",
-    console=True,
+    console=False,
 )
 
 coll = COLLECT(
