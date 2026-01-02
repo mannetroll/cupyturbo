@@ -24,7 +24,8 @@ cuda = [
 ]
 
 [project.scripts]
-cupyturbo = "cupyturbo.dns_main:main"
+turbulence = "cupyturbo.dns_main:main"
+fps = "cupyturbo.dns_simulator:main"
 
 # Package discovery
 [tool.setuptools.packages.find]

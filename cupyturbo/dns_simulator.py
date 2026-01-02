@@ -1491,9 +1491,9 @@ def run_dns(
     elap = t1 - t0
     fps = (STEPS / elap) if elap > 0 else 0.0
 
-    print(f" Elapsed CPU time for {STEPS} steps (s) = {elap:12.4f}")
-    print(f" Frames per second (FPS)                 = {fps:12.4f}")
-    print(f" Final T={S.t:12.4f}  CN={S.cn:12.4f}  DT={S.dt:12.4f}  VISC={S.visc:12.4f}")
+    print(f" Elapsed CPU time for {STEPS} steps (s) = {elap:8g}")
+    print(f" Final T={S.t:8g}  CN={S.cn:8g}  DT={S.dt:8g}  VISC={S.visc:8g}")
+    print(f" FPS = {fps:7g}")
 
     #dump_field_as_pgm_full(S, 0, "u_python.pgm")
     #dump_field_as_pgm_full(S, 1, "v_python.pgm")
@@ -1508,7 +1508,7 @@ def main():
     N = int(args[0]) if len(args) > 0 else 256
     Re = float(args[1]) if len(args) > 1 else 10000
     K0 = float(args[2]) if len(args) > 2 else 10.0
-    STEPS = int(args[3]) if len(args) > 3 else 101
+    STEPS = int(args[3]) if len(args) > 3 else 201
     CFL = float(args[4]) if len(args) > 4 else 0.75
 
     # 6th arg: backend ("cpu" | "gpu" | "auto"), default "auto"
