@@ -1,4 +1,10 @@
 # macos.spec
+# Build:
+#   rm -rf build dist
+#   uv run pyinstaller macos.spec
+#   ./dist/cupyturbo.app/Contents/MacOS/cupyturbo
+#
+
 a = Analysis(
     ["cupyturbo/dns_main.py"],
     pathex=["."],
@@ -26,8 +32,8 @@ coll = COLLECT(
 )
 
 app = BUNDLE(
-    exe,
+    coll,
     name="cupyturbo.app",
     icon="cupyturbo/cupyturbo.icns",
-    bundle_identifier="se.mannetroll.cupyturbo",  # adjust to your preferred ID
+    bundle_identifier="se.mannetroll.cupyturbo",
 )
