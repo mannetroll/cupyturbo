@@ -29,6 +29,7 @@ formulas follow the CUDA kernels line-by-line.
 """
 
 import time
+import datetime as _dt
 import math
 import sys
 from dataclasses import dataclass
@@ -1172,7 +1173,7 @@ def run_dns(
     CFL: float = 0.75,
     backend: Literal["cpu", "gpu", "auto"] = "auto",
 ) -> None:
-    print("--- INITIALIZING PYTHON (NumPy/CuPy) ---")
+    print("--- INITIALIZING NumPy/CuPy ---", _dt.datetime.now().strftime("%Y-%m-%d %H:%M"))
     print(f" N   = {N}")
     print(f" Re  = {Re}")
     print(f" K0  = {K0}")
