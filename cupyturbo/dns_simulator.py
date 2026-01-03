@@ -28,8 +28,6 @@ The 3/2 de-aliasing, Crank–Nicolson update, and spectral vorticity
 formulas follow the CUDA kernels line-by-line.
 """
 
-from __future__ import annotations
-
 import time
 import math
 import sys
@@ -363,10 +361,6 @@ def create_dns_state(
     )
 
     return state
-
-# ---------------------------------------------------------------------------
-# PAO host init — ported in spirit, simplified
-# ---------------------------------------------------------------------------
 
 # ===============================================================
 # Python/Numpy port of dnsCudaPaoHostInit, wired into DnsState

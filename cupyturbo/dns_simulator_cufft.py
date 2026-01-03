@@ -776,6 +776,12 @@ def dns_calcom_from_uc_full(S: DnsState) -> None:
 
 # ---------------------------------------------------------------------------
 # STEP2B — build uiuj and forward FFT (dnsCudaStep2B)
+#
+# Mirrors Fortran STEP2B:
+#
+#   1) Build uiuj in UR(x,z,1..3)
+#   2) VRFFTF + VCFFTF on UR(.,.,I) for I=1..3  → UC(.,.,I)
+#   3) Zero UC(X,NZ+1,I) for X<=NX/2, I=1..3
 # ---------------------------------------------------------------------------
 def dns_step2b(S: DnsState) -> None:
     """
@@ -804,10 +810,21 @@ def dns_step2b(S: DnsState) -> None:
 
     # ------------------------------------------------------------------
     # 1) Build uiuj on the full 3/2 grid
+    #
+    # Before STEP2B (UR_full):
+    #   comp 0 → u(x,z)
+    #   comp 1 → w(x,z)
+    #   comp 2 → (don't care)
+    #
+    # After this block (Fortran UIUJ build):
+    #   UR(:,:,3) = u*w  → comp 2
+    #   UR(:,:,1) = u*u  → comp 0
+    #   UR(:,:,2) = w*w  → comp 1
     # ------------------------------------------------------------------
     u = UR[0]   # (NZ_full, NX_full)
     w = UR[1]   # (NZ_full, NX_full)
 
+    # Use in-place multiplies to avoid temporaries
     xp.multiply(u, w, out=UR[2])  # u * w
     xp.multiply(u, u, out=UR[0])  # u^2
     xp.multiply(w, w, out=UR[1])  # w^2
