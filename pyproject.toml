@@ -27,6 +27,7 @@ cuda = [
 turbulence = "cupyturbo.dns_main:main"
 fps = "cupyturbo.dns_simulator:main"
 cufft = "cupyturbo.dns_simulator_cufft:main"
+numpy= "cupyturbo.dns_simulator_numpy:main"
 
 # Package discovery
 [tool.setuptools.packages.find]
