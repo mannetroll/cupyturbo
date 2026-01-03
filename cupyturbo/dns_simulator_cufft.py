@@ -48,9 +48,9 @@ except Exception:  # CuPy is optional
 _CUPY_USABLE = None
 
 try:
-    import cupyx.scipy.fftpack as _cpfftpack  # type: ignore
+    import cupyx.scipy.fft as _cpfft  # type: ignore
 except Exception:
-    _cpfftpack = None
+    _cpfft = None
 
 import numpy as np  # in addition to your existing _np alias, this is fine
 
@@ -361,13 +361,13 @@ def create_dns_state(
     # ------------------------------------------------------------
     # Reusable cuFFT plans (GPU only; includes backend="auto" when it resolves to GPU)
     # ------------------------------------------------------------
-    if state.backend == "gpu" and _cpfftpack is not None:
-        state.cufft_plan_r2c_2d = _cpfftpack.get_fft_plan(
+    if state.backend == "gpu" and _cpfft is not None:
+        state.cufft_plan_r2c_2d = _cpfft.get_fft_plan(
             state.ur_full,
             axes=(1, 2),
             value_type="R2C",
         )
-        state.cufft_plan_c2r_2d = _cpfftpack.get_fft_plan(
+        state.cufft_plan_c2r_2d = _cpfft.get_fft_plan(
             state.uc_full,
             shape=(state.NZ_full, state.NX_full),
             axes=(1, 2),
