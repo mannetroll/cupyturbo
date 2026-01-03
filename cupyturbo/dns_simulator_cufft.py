@@ -933,6 +933,103 @@ def next_dt(S: DnsState) -> None:
     S.dt = S.dt * S.cn
 
 
+# ===============================================================
+# Python equivalent of dnsCudaDumpFieldAsPGMFull
+# ===============================================================
+def dump_field_as_pgm_full(S: DnsState, comp: int, filename: str) -> None:
+    """
+    Python/CuPy version of:
+
+        void dnsCudaDumpFieldAsPGMFull(DnsDeviceState *S, int comp,
+                                       const char *filename)
+
+    Uses S.ur_full (3, NZ_full, NX_full), SoA layout:
+      ur_full[comp, z, x]
+
+    Writes an 8-bit binary PGM (P5) file with values mapped
+    linearly from [minv, maxv] → [1, 255], same as the CUDA code.
+    """
+    NX_full = S.NX_full
+    NZ_full = S.NZ_full
+
+    # ------------------------------------------------------------
+    # Bring UR_full to host as float32, layout [comp][z][x]
+    # ------------------------------------------------------------
+    if S.backend == "gpu":
+        ur_full_host = _np.asarray(S.ur_full.get(), dtype=_np.float32)
+    else:
+        ur_full_host = _np.asarray(S.ur_full, dtype=_np.float32)
+
+    # Selected component plane: shape (NZ_full, NX_full)
+    field = ur_full_host[comp, :, :]
+
+    # ------------------------------------------------------------
+    # Compute min and max over the selected component
+    # layout: [comp][z][x]
+    # ------------------------------------------------------------
+    minv = float(field.min())
+    maxv = float(field.max())
+
+    try:
+        f = open(filename, "wb")
+    except OSError as e:
+        print(f"[DUMP] fopen failed for {filename!r}: {e}")
+        return
+
+    # P5 header: binary grayscale
+    header = f"P5\n{NX_full} {NZ_full}\n255\n"
+    f.write(header.encode("ascii"))
+
+    rng = maxv - minv
+
+    # ------------------------------------------------------------
+    # Map [minv, maxv] → [1, 255]
+    # If nearly constant field, use mid-grey 128
+    # ------------------------------------------------------------
+    if abs(rng) <= 1.0e-12:
+        # field is essentially constant
+        c = bytes([128])
+        row = c * NX_full
+        for _ in range(NZ_full):
+            f.write(row)
+    else:
+        for j in range(NZ_full):
+            for i in range(NX_full):
+                val = float(field[j, i])
+
+                # normalize to [0,1]
+                norm = (val - minv) / rng   # 0 .. 1
+
+                # scale to [1,255]
+                pixf = 1.0 + norm * 254.0
+                pix = int(pixf + 0.5)
+                if pix < 1:
+                    pix = 1
+                if pix > 255:
+                    pix = 255
+
+                f.write(bytes([pix]))
+
+    f.close()
+    print(f"[DUMP] Wrote {filename} (PGM, {NX_full}x{NZ_full}, "
+          f"comp={comp}, min={minv:g}, max={maxv:g})")
+
+# ---------------------------------------------------------------------------
+# Helpers for visualization fields (energy, vorticity, streamfunction)
+# These are Python/xp equivalents of:
+#   FIELD2KIN  + DNS_KINETIC
+#   OM2PHYS    + DNS_OM2PHYS
+#   STREAMFUNC + DNS_STREAMFUNC
+#
+# They follow the "dns_all" convention used by your GUI:
+#   - dns_kinetic(S)     → fills S.ur_full[2, :, :] with |u|
+#   - dns_om2_phys(S)    → fills S.ur_full[2, :, :] with ω(x,z)
+#   - dns_stream_func(S) → fills S.ur_full[2, :, :] with φ(x,z)
+#
+# The GUI then does:
+#     dns_all.dns_kinetic(S)
+#     field = (cp.asnumpy or np.asarray)(S.ur_full[2, :, :])
+#     plane = self._float_to_pixels(field)
 # ---------------------------------------------------------------------------
 
 
