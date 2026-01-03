@@ -269,11 +269,7 @@ class DnsState:
     # Reusable cuFFT plans (GPU only)
     cufft_plan_r2c_2d: any = None
     cufft_plan_c2r_2d: any = None
-
-    # Dedicated complex scratch buffers (reused; avoids allocating these arrays each call)
-    fft_tmp_cplx: any = None    # (3, NZ_full, NK_full) complex64
-    fft_tmp2_cplx: any = None   # (3, NZ_full, NK_full) complex64
-    fft_tmp_plane: any = None   # (NZ_full, NK_full) complex64
+    cufft_plan_c2r_2d_uc01: any = None
 
     # Dedicated complex scratch buffers (reused; avoids allocating these arrays each call)
     fft_tmp_cplx: any = None    # (3, NZ_full, NK_full) complex64
@@ -374,6 +370,12 @@ def create_dns_state(
         )
         state.cufft_plan_c2r_2d = _cpfft.get_fft_plan(
             state.uc_full,
+            shape=(state.NZ_full, state.NX_full),
+            axes=(1, 2),
+            value_type="C2R",
+        )
+        state.cufft_plan_c2r_2d_uc01 = _cpfft.get_fft_plan(
+            state.uc_full[0:2, :, :],
             shape=(state.NZ_full, state.NX_full),
             axes=(1, 2),
             value_type="C2R",
@@ -677,26 +679,23 @@ def vfft_full_inverse_uc_full_to_ur_full(S: DnsState) -> None:
     xp = S.xp
     UC = S.uc_full
 
-    UC01 = UC[0:2, :, :]
-
     if S.backend == "gpu" and S.cufft_plan_c2r_2d is not None:
-        ur01 = xp.fft.irfft2(
-            UC01,
-            s=(S.NZ_full, S.NX_full),
-            axes=(1, 2),
-        )
-        S.ur_full[0:2, :, :] = ur01.astype(xp.float32, copy=False)
-        S.ur_full[2, :, :] = 0.0
+        with S.cufft_plan_c2r_2d:
+            ur_full = xp.fft.irfft2(
+                UC,
+                s=(S.NZ_full, S.NX_full),
+                axes=(1, 2),
+            )
+        S.ur_full[...] = ur_full.astype(xp.float32)
         return
 
     # 1) inverse along z (scaled by 1/NZ_full)
-    S.fft_tmp2_cplx[0:2, :, :] = xp.fft.ifft(UC01, axis=1)
+    S.fft_tmp2_cplx[...] = xp.fft.ifft(UC, axis=1)
 
     # 2) inverse along x (scaled by 1/NX_full)
-    ur01 = xp.fft.irfft(S.fft_tmp2_cplx[0:2, :, :], n=S.NX_full, axis=2)
+    ur_full = xp.fft.irfft(S.fft_tmp2_cplx, n=S.NX_full, axis=2)
 
-    S.ur_full[0:2, :, :] = ur01.astype(xp.float32, copy=False)
-    S.ur_full[2, :, :] = 0.0
+    S.ur_full[...] = ur_full.astype(xp.float32)
 
 
 def vfft_full_forward_ur_full_to_uc_full(S: DnsState) -> None:
@@ -1042,21 +1041,22 @@ def dns_step2a(S: DnsState) -> None:
     # ----------------------------------------------------------
     UC01 = UC[0:2, :, :]
 
-    if S.backend == "gpu" and S.cufft_plan_c2r_2d is not None:
-        ur01 = xp.fft.irfft2(
-            UC01,
-            s=(NZ_full, NX_full),
-            axes=(1, 2),
-        )
+    if S.backend == "gpu" and S.cufft_plan_c2r_2d_uc01 is not None:
+        with S.cufft_plan_c2r_2d_uc01:
+            ur01 = xp.fft.irfft2(
+                UC01,
+                s=(NZ_full, NX_full),
+                axes=(1, 2),
+            )
         # Match CUFFT (unscaled inverse) convention used elsewhere:
         ur01 *= (NZ_full * NX_full)
-        S.ur_full[0:2, :, :] = ur01.astype(xp.float32, copy=False)
-        S.ur_full[2, :, :] = 0.0
+        S.ur_full[0:2, :, :] = ur01.astype(xp.float32)
+        S.ur_full[2, :, :] = xp.float32(0.0)
     else:
         UC01[:, :, :] = xp.fft.ifft(UC01, axis=1) * NZ_full
         ur01 = xp.fft.irfft(UC01, n=NX_full, axis=2) * NX_full
-        S.ur_full[0:2, :, :] = ur01.astype(xp.float32, copy=False)
-        S.ur_full[2, :, :] = 0.0
+        S.ur_full[0:2, :, :] = ur01.astype(xp.float32)
+        S.ur_full[2, :, :] = xp.float32(0.0)
 
     off_x = (NX_full - NX) // 2
     off_z = (NZ_full - NZ) // 2
