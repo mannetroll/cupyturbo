@@ -345,7 +345,7 @@ class MainWindow(QMainWindow):
         self.image_label.setMinimumSize(1, 1)
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # --- small icon buttons ---
+
         style = QApplication.style()
 
         # Start button
@@ -410,7 +410,7 @@ class MainWindow(QMainWindow):
         # K0 selector
         self.k0_combo = QComboBox()
         self.k0_combo.setToolTip("K: Initial energy peak wavenumber (K0)")
-        self.k0_combo.addItems(["1", "5", "10", "15", "25", "35", "50"])
+        self.k0_combo.addItems(["5", "10", "15", "20", "25", "35", "50", "90"])
         self.k0_combo.setCurrentText(str(int(self.sim.k0)))
 
         # Colormap selector
@@ -437,7 +437,7 @@ class MainWindow(QMainWindow):
         self.update_combo = QComboBox()
         self.update_combo.setToolTip("U: Update intervall")
         self.update_combo.addItems(["2", "5", "10", "20", "50", "100", "1E3"])
-        self.update_combo.setCurrentText("5")
+        self.update_combo.setCurrentText("10")
 
         self.auto_reset_checkbox = QCheckBox()
         self.auto_reset_checkbox.setToolTip("If checked, simulation auto-resets")
