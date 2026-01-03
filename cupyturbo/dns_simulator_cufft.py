@@ -275,6 +275,11 @@ class DnsState:
     fft_tmp2_cplx: any = None   # (3, NZ_full, NK_full) complex64
     fft_tmp_plane: any = None   # (NZ_full, NK_full) complex64
 
+    # Dedicated complex scratch buffers (reused; avoids allocating these arrays each call)
+    fft_tmp_cplx: any = None    # (3, NZ_full, NK_full) complex64
+    fft_tmp2_cplx: any = None   # (3, NZ_full, NK_full) complex64
+    fft_tmp_plane: any = None   # (NZ_full, NK_full) complex64
+
     def sync(self):
         """For a CuPy backend, force synchronization at convenient checkpoints."""
         if self.backend == "gpu":
@@ -675,12 +680,11 @@ def vfft_full_inverse_uc_full_to_ur_full(S: DnsState) -> None:
     UC01 = UC[0:2, :, :]
 
     if S.backend == "gpu" and S.cufft_plan_c2r_2d is not None:
-        with S.cufft_plan_c2r_2d:
-            ur01 = xp.fft.irfft2(
-                UC01,
-                s=(S.NZ_full, S.NX_full),
-                axes=(1, 2),
-            )
+        ur01 = xp.fft.irfft2(
+            UC01,
+            s=(S.NZ_full, S.NX_full),
+            axes=(1, 2),
+        )
         S.ur_full[0:2, :, :] = ur01.astype(xp.float32, copy=False)
         S.ur_full[2, :, :] = 0.0
         return
@@ -1039,12 +1043,11 @@ def dns_step2a(S: DnsState) -> None:
     UC01 = UC[0:2, :, :]
 
     if S.backend == "gpu" and S.cufft_plan_c2r_2d is not None:
-        with S.cufft_plan_c2r_2d:
-            ur01 = xp.fft.irfft2(
-                UC01,
-                s=(NZ_full, NX_full),
-                axes=(1, 2),
-            )
+        ur01 = xp.fft.irfft2(
+            UC01,
+            s=(NZ_full, NX_full),
+            axes=(1, 2),
+        )
         # Match CUFFT (unscaled inverse) convention used elsewhere:
         ur01 *= (NZ_full * NX_full)
         S.ur_full[0:2, :, :] = ur01.astype(xp.float32, copy=False)
