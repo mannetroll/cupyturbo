@@ -271,11 +271,6 @@ class DnsState:
     cufft_plan_c2r_2d: any = None
     cufft_plan_c2r_2d_uc01: any = None
 
-    # Dedicated complex scratch buffers (reused; avoids allocating these arrays each call)
-    fft_tmp_cplx: any = None    # (3, NZ_full, NK_full) complex64
-    fft_tmp2_cplx: any = None   # (3, NZ_full, NK_full) complex64
-    fft_tmp_plane: any = None   # (NZ_full, NK_full) complex64
-
     def sync(self):
         """For a CuPy backend, force synchronization at convenient checkpoints."""
         if self.backend == "gpu":
@@ -353,11 +348,6 @@ def create_dns_state(
 
     state.scratch1 = xp.zeros((NZ, NX_half), dtype=xp.complex64)
     state.scratch2 = xp.zeros((NZ, NX_half), dtype=xp.complex64)
-
-    # Dedicated complex scratch buffers
-    state.fft_tmp_cplx = xp.empty((3, NZ_full, NK_full), dtype=xp.complex64)
-    state.fft_tmp2_cplx = xp.empty((3, NZ_full, NK_full), dtype=xp.complex64)
-    state.fft_tmp_plane = xp.empty((NZ_full, NK_full), dtype=xp.complex64)
 
     # ------------------------------------------------------------
     # Reusable cuFFT plans (GPU only; includes backend="auto" when it resolves to GPU)
@@ -672,9 +662,6 @@ def dns_pao_host_init(S: DnsState):
 def vfft_full_inverse_uc_full_to_ur_full(S: DnsState) -> None:
     """
     UC_full (3, NZ_full, NK_full) → UR_full (3, NZ_full, NX_full)
-
-    If GPU and plans exist, use a single irfft2 with the reusable cuFFT plan.
-    Otherwise keep the original separable ifft/irfft path (with dedicated scratch).
     """
     xp = S.xp
     UC = S.uc_full
@@ -685,15 +672,16 @@ def vfft_full_inverse_uc_full_to_ur_full(S: DnsState) -> None:
                 UC,
                 s=(S.NZ_full, S.NX_full),
                 axes=(1, 2),
+                norm="forward",
             )
         S.ur_full[...] = ur_full.astype(xp.float32)
         return
 
     # 1) inverse along z (scaled by 1/NZ_full)
-    S.fft_tmp2_cplx[...] = xp.fft.ifft(UC, axis=1)
+    tmp = xp.fft.ifft(UC, axis=1)
 
     # 2) inverse along x (scaled by 1/NX_full)
-    ur_full = xp.fft.irfft(S.fft_tmp2_cplx, n=S.NX_full, axis=2)
+    ur_full = xp.fft.irfft(tmp, n=S.NX_full, axis=2)
 
     S.ur_full[...] = ur_full.astype(xp.float32)
 
@@ -701,9 +689,6 @@ def vfft_full_inverse_uc_full_to_ur_full(S: DnsState) -> None:
 def vfft_full_forward_ur_full_to_uc_full(S: DnsState) -> None:
     """
     UR_full (3, NZ_full, NX_full) → UC_full (3, NZ_full, NK_full)
-
-    If GPU and plans exist, use a single rfft2 with the reusable cuFFT plan.
-    Otherwise keep the original separable rfft/fft path (with dedicated scratch).
     """
     xp = S.xp
     UR = S.ur_full
@@ -719,10 +704,10 @@ def vfft_full_forward_ur_full_to_uc_full(S: DnsState) -> None:
         return
 
     # 1) real FFT along x
-    S.fft_tmp_cplx[...] = xp.fft.rfft(UR, axis=2)
+    tmp = xp.fft.rfft(UR, axis=2)
 
     # 2) FFT along z
-    UC = xp.fft.fft(S.fft_tmp_cplx, axis=1)
+    UC = xp.fft.fft(tmp, axis=1)
 
     S.uc_full[...] = UC
 
@@ -736,13 +721,6 @@ def dns_calcom_from_uc_full(S: DnsState) -> None:
     Python/xp port of dnsCudaCalcom:
 
       OM2(ix,iz) = i * [ GAMMA(iz)*UC1(ix,iz) - ALFA(ix)*UC2(ix,iz) ]
-
-    Uses:
-      S.uc_full : (3, NZ_full, NK_full)  [comp,z,kx]
-      S.alfa    : (NX_half,)
-      S.gamma   : (NZ,)
-    Writes:
-      S.om2     : (NZ, NX_half)
     """
     xp = S.xp
 
@@ -768,10 +746,8 @@ def dns_calcom_from_uc_full(S: DnsState) -> None:
     ax = alfa_1d[None, :]                     # (1, NX_half)
     gz = gamma_1d[:, None]                    # (NZ, 1)
 
-    # diff = GAMMA*UC1 - ALFA*UC2
     diff = gz * uc1 - ax * uc2                # (NZ, NX_half), complex
 
-    # om = i * diff = (-Im(diff), Re(diff))
     diff_r = diff.real
     diff_i = diff.imag
 
@@ -783,75 +759,35 @@ def dns_calcom_from_uc_full(S: DnsState) -> None:
 
 # ---------------------------------------------------------------------------
 # STEP2B — build uiuj and forward FFT (dnsCudaStep2B)
-#
-# Mirrors Fortran STEP2B:
-#
-#   1) Build uiuj in UR(x,z,1..3)
-#   2) VRFFTF + VCFFTF on UR(.,.,I) for I=1..3  → UC(.,.,I)
-#   3) Zero UC(X,NZ+1,I) for X<=NX/2, I=1..3
 # ---------------------------------------------------------------------------
 def dns_step2b(S: DnsState) -> None:
     """
     Python/CuPy port of dnsCudaStep2B(DnsDeviceState *S).
-
-    Mirrors Fortran STEP2B:
-
-      1) Build uiuj in UR(x,z,1..3) on the full 3/2 grid
-      2) Full-grid forward FFT: UR_full → UC_full (3 components)
-         (VRFFTF + VCFFTF in Fortran)
-      3) Zero UC(X,NZ+1,I) for X<=NX/2, I=1..3
     """
     xp = S.xp
 
-    # Geometry on the full 3/2 grid
-    N       = S.Nbase          # NX = NZ = Nbase (Fortran NX,NZ)
-    NX_full = S.NX_full        # 3*N/2
-    NZ_full = S.NZ_full        # 3*N/2
-    NK_full = S.NK_full        # 3*N/4+1
+    N       = S.Nbase
+    NX_full = S.NX_full
+    NZ_full = S.NZ_full
+    NK_full = S.NK_full
 
-    # SoA layout:
-    #   UR_full[comp, z, x]    with comp=0,1,2
-    #   UC_full[comp, z, kx]
     UR = S.ur_full
     UC = S.uc_full
 
-    # ------------------------------------------------------------------
-    # 1) Build uiuj on the full 3/2 grid
-    #
-    # Before STEP2B (UR_full):
-    #   comp 0 → u(x,z)
-    #   comp 1 → w(x,z)
-    #   comp 2 → (don't care)
-    #
-    # After this block (Fortran UIUJ build):
-    #   UR(:,:,3) = u*w  → comp 2
-    #   UR(:,:,1) = u*u  → comp 0
-    #   UR(:,:,2) = w*w  → comp 1
-    # ------------------------------------------------------------------
-    u = UR[0]   # (NZ_full, NX_full)
-    w = UR[1]   # (NZ_full, NX_full)
+    u = UR[0]
+    w = UR[1]
 
-    # Use in-place multiplies to avoid temporaries
     xp.multiply(u, w, out=UR[2])  # u * w
     xp.multiply(u, u, out=UR[0])  # u^2
     xp.multiply(w, w, out=UR[1])  # w^2
 
-    # ------------------------------------------------------------------
-    # 2) Full-grid forward FFT: UR_full → UC_full (3 components)
-    #
-    # CPU optimization stays (per-comp); GPU uses plan-based rfft2 when available.
-    # ------------------------------------------------------------------
     if S.backend == "cpu":
-        tmp_plane = S.fft_tmp_plane  # (NZ_full, NK_full) complex64
         for comp in range(3):
-            tmp_plane[...] = xp.fft.rfft(UR[comp], axis=1)      # (NZ_full, NK_full)
-            UC[comp, :, :] = xp.fft.fft(tmp_plane, axis=0)      # (NZ_full, NK_full)
+            tmp_plane = xp.fft.rfft(UR[comp], axis=1)
+            UC[comp, :, :] = xp.fft.fft(tmp_plane, axis=0)
     else:
         vfft_full_forward_ur_full_to_uc_full(S)
 
-    # ------------------------------------------------------------------
-    # 3) Zero the "middle" Fourier coefficient UC(X,NZ+1,I)
-    # ------------------------------------------------------------------
     NX_half = N // 2
     NZ      = N
     z_mid   = NZ
@@ -865,23 +801,15 @@ def dns_step2b(S: DnsState) -> None:
 # STEP3 — vorticity update using om2 & fnm1
 # ---------------------------------------------------------------------------
 def dns_step3(S: DnsState) -> None:
-    """
-    STEP3 — update spectral vorticity OM2 and non-linear term FNM1,
-    then reconstruct the low-k velocity spectrum UC_full from OM2.
-    """
     xp = S.xp
 
-    om2     = S.om2        # shape (NZ, NX_half), complex64
-    fnm1    = S.fnm1       # shape (NZ, NX_half), complex64
-    alfa    = S.alfa       # shape (NX_half,), float32
-    gamma   = S.gamma      # shape (NZ,),      float32
-    uc_full = S.uc_full    # shape (3, NZ_full, NK_full), complex64
+    om2     = S.om2
+    fnm1    = S.fnm1
+    alfa    = S.alfa
+    gamma   = S.gamma
+    uc_full = S.uc_full
 
     Nbase   = int(S.Nbase)
-    NX_full = int(S.NX_full)
-    NZ_full = int(S.NZ_full)
-    NK_full = int(S.NK_full)
-
     NX_half = Nbase // 2
     NZ      = Nbase
 
@@ -1038,6 +966,7 @@ def dns_step2a(S: DnsState) -> None:
 
     # ----------------------------------------------------------
     # Inverse transforms to UR_full (plan-based 2D on GPU when available)
+    # Only components 0:2 are needed (u,w). comp2 is set to 0 here.
     # ----------------------------------------------------------
     UC01 = UC[0:2, :, :]
 
@@ -1047,9 +976,8 @@ def dns_step2a(S: DnsState) -> None:
                 UC01,
                 s=(NZ_full, NX_full),
                 axes=(1, 2),
+                norm="forward",
             )
-        # Match CUFFT (unscaled inverse) convention used elsewhere:
-        ur01 *= (NZ_full * NX_full)
         S.ur_full[0:2, :, :] = ur01.astype(xp.float32)
         S.ur_full[2, :, :] = xp.float32(0.0)
     else:
@@ -1071,10 +999,6 @@ def dns_step2a(S: DnsState) -> None:
 # ---------------------------------------------------------------------------
 
 def compute_cflm(S: DnsState) -> float:
-    """
-    Compute CFLM = max(|u|/dx + |w|/dz) on the full 3/2 grid,
-    same definition as in CUDA.
-    """
     xp = S.xp
     PI = math.pi
 
@@ -1091,9 +1015,6 @@ def compute_cflm(S: DnsState) -> float:
     return CFLM
 
 def next_dt(S: DnsState) -> None:
-    """
-    Python version of next_dt_gpu.
-    """
     PI = math.pi
 
     CFLM = compute_cflm(S)
@@ -1241,7 +1162,7 @@ def dns_stream_func(S: DnsState) -> None:
     S.ur_full[2, :, :] = phys
 
 # ---------------------------------------------------------------------------
-# Main driver (Python version of main in dns_all.cu)
+# Main driver
 # ---------------------------------------------------------------------------
 def run_dns(
     N: int = 8,
@@ -1298,9 +1219,6 @@ def run_dns(
     print(f" Elapsed CPU time for {STEPS} steps (s) = {elap:8g}")
     print(f" Final T={S.t:8g}  CN={S.cn:8g}  DT={S.dt:8g}")
     print(f" FPS = {fps:7g}")
-
-    #dump_field_as_pgm_full(S, 0, "u_python.pgm")
-    #dump_field_as_pgm_full(S, 1, "v_python.pgm")
 
 
 def main():
