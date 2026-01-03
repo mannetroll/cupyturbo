@@ -267,6 +267,12 @@ class DnsState:
     step3_kx_indices: any = None
     step3_z_spec: any = None
 
+    # Precomputed constant spectral factors (avoid per-step allocations in STEP3)
+    step3_K2: any = None            # (NZ, NX_half) float32
+    step3_GA: any = None            # (NZ, NX_half) float32
+    step3_G2_minus_A2: any = None   # (NZ, NX_half) float32
+    step3_FN_tmp: any = None        # (NZ, NX_half) complex64
+
     # Reusable cuFFT plans (GPU only)
     cufft_plan_r2c_2d: any = None
     cufft_plan_c2r_2d: any = None
@@ -349,6 +355,7 @@ def create_dns_state(
 
     state.scratch1 = xp.zeros((NZ, NX_half), dtype=xp.complex64)
     state.scratch2 = xp.zeros((NZ, NX_half), dtype=xp.complex64)
+    state.step3_FN_tmp = xp.empty((NZ, NX_half), dtype=xp.complex64)
 
     # ------------------------------------------------------------
     # Reusable cuFFT plans (GPU only; includes backend="auto" when it resolves to GPU)
@@ -392,6 +399,18 @@ def create_dns_state(
         zi,
         zi + NZ_half,
     )
+
+    # Precompute constant spectral factors for STEP3 (K2, GA, G2-A2)
+    # Shapes: (NZ, NX_half)
+    alfa_1d  = state.alfa.astype(xp.float32)
+    gamma_1d = state.gamma.astype(xp.float32)
+    ax = alfa_1d[None, :]
+    gz = gamma_1d[:, None]
+    A2 = ax * ax
+    G2 = gz * gz
+    state.step3_K2 = A2 + G2
+    state.step3_GA = gz * ax
+    state.step3_G2_minus_A2 = G2 - A2
 
     return state
 
@@ -653,8 +672,7 @@ def dns_pao_host_init(S: DnsState):
     dns_calcom_from_uc_full(S)
 
     # No history yet
-    S.fnm1[...] = xp.zeros_like(S.om2)
-
+    S.fnm1.fill(0)
 
 # ---------------------------------------------------------------------------
 # FFT helpers (vfft_full_* equivalents)
@@ -806,8 +824,6 @@ def dns_step3(S: DnsState) -> None:
 
     om2     = S.om2
     fnm1    = S.fnm1
-    alfa    = S.alfa
-    gamma   = S.gamma
     uc_full = S.uc_full
 
     Nbase   = int(S.Nbase)
@@ -819,38 +835,57 @@ def dns_step3(S: DnsState) -> None:
     cn   = xp.float32(S.cn)
     cnm1 = xp.float32(S.cnm1)
 
-    alfa_1d  = alfa.astype(xp.float32)
-    gamma_1d = gamma.astype(xp.float32)
+    # Use precomputed constant spectral factors (set up in create_dns_state)
+    K2 = S.step3_K2
+    GA = S.step3_GA
+    G2_minus_A2 = S.step3_G2_minus_A2
 
-    ax = alfa_1d[None, :]
-    gz = gamma_1d[:, None]
-
-    A2 = ax * ax
-    G2 = gz * gz
-    K2 = A2 + G2
-
-    z_spec = S.step3_z_spec
-
+    # Gather uc1/uc2/uc3 in STEP3's Fortran ordering without fancy indexing
+    # z in [0..NZ/2-1] uses z, z in [NZ/2..NZ-1] uses z+NZ/2 (i.e. rows N..N+NZ/2-1)
+    NZ_half = NZ // 2
     uc0 = uc_full[0]
     uc1 = uc_full[1]
     uc2 = uc_full[2]
 
-    kx_idx = S.step3_kx_indices
+    # Low half (0..NZ_half-1)
+    uc1_lo = uc0[0:NZ_half, 0:NX_half]
+    uc2_lo = uc1[0:NZ_half, 0:NX_half]
+    uc3_lo = uc2[0:NZ_half, 0:NX_half]
 
-    uc1_th = uc0[z_spec[:, None], kx_idx[None, :]]
-    uc2_th = uc1[z_spec[:, None], kx_idx[None, :]]
-    uc3_th = uc2[z_spec[:, None], kx_idx[None, :]]
+    # High half (NZ_half..NZ-1) maps to rows N..N+NZ_half-1
+    z0 = NZ
+    z1 = NZ + NZ_half
+    uc1_hi = uc0[z0:z1, 0:NX_half]
+    uc2_hi = uc1[z0:z1, 0:NX_half]
+    uc3_hi = uc2[z0:z1, 0:NX_half]
 
-    NX32 = xp.float32(1.5) * xp.float32(Nbase)
-    NZ32 = xp.float32(1.5) * xp.float32(Nbase)
-    DIVXZ = xp.float32(1.0) / (NX32 * NZ32)
+    # Compute FN into a reusable buffer (avoid allocations)
+    FN = S.step3_FN_tmp
+    tmp_mul = S.scratch2  # reused temporarily; overwritten later
 
-    GA          = gz * ax
-    G2_minus_A2 = G2 - A2
+    FN_lo = FN[0:NZ_half, :]
+    GA_lo = GA[0:NZ_half, :]
+    G2mA2_lo = G2_minus_A2[0:NZ_half, :]
+    tmp_lo = tmp_mul[0:NZ_half, :]
 
-    diff12 = uc1_th - uc2_th
+    FN_lo[...] = uc1_lo
+    FN_lo[...] -= uc2_lo
+    FN_lo[...] *= GA_lo
+    xp.multiply(G2mA2_lo, uc3_lo, out=tmp_lo)
+    FN_lo[...] += tmp_lo
+    FN_lo[...] *= xp.float32(1.0) / (xp.float32(1.5) * xp.float32(Nbase) * xp.float32(1.5) * xp.float32(Nbase))
 
-    FN = (GA * diff12 + G2_minus_A2 * uc3_th) * DIVXZ
+    FN_hi = FN[NZ_half:NZ, :]
+    GA_hi = GA[NZ_half:NZ, :]
+    G2mA2_hi = G2_minus_A2[NZ_half:NZ, :]
+    tmp_hi = tmp_mul[NZ_half:NZ, :]
+
+    FN_hi[...] = uc1_hi
+    FN_hi[...] -= uc2_hi
+    FN_hi[...] *= GA_hi
+    xp.multiply(G2mA2_hi, uc3_hi, out=tmp_hi)
+    FN_hi[...] += tmp_hi
+    FN_hi[...] *= xp.float32(1.0) / (xp.float32(1.5) * xp.float32(Nbase) * xp.float32(1.5) * xp.float32(Nbase))
 
     VT  = xp.float32(0.5) * visc * dt
     ARG = VT * K2
@@ -863,8 +898,8 @@ def dns_step3(S: DnsState) -> None:
     num = c1 * om2 + c2 * FN + c3 * fnm1
     om_new = num / DEN
 
-    S.om2  = om_new
-    S.fnm1 = FN
+    S.om2[...] = om_new
+    S.fnm1[...] = FN
 
     om = S.om2
 
@@ -873,9 +908,13 @@ def dns_step3(S: DnsState) -> None:
     out1[...] = 0
     out2[...] = 0
 
-    gz2d = gamma_1d[:, None]
-
+    # Reconstruct velocity spectrum from vorticity (matches CUDA structure)
+    # kx>=1
     if NX_half > 1:
+        alfa_1d = S.alfa.astype(xp.float32)
+        gamma_1d = S.gamma.astype(xp.float32)
+        gz2d = gamma_1d[:, None]
+
         alfa_sub = alfa_1d[1:].reshape(1, -1)
 
         A2_sub = alfa_sub * alfa_sub
@@ -902,6 +941,9 @@ def dns_step3(S: DnsState) -> None:
         out2[:, 1:].real = -axi
         out2[:, 1:].imag = axr
 
+    # kx==0
+    alfa_1d = S.alfa.astype(xp.float32)
+    gamma_1d = S.gamma.astype(xp.float32)
     w0   = om[:, 0]
     gz1d = gamma_1d
 
@@ -914,14 +956,18 @@ def dns_step3(S: DnsState) -> None:
     out1[:, 0].real = xp.where(mask, v0.imag.astype(xp.float32), xp.float32(0.0))
     out1[:, 0].imag = xp.where(mask, (-v0.real).astype(xp.float32), xp.float32(0.0))
 
-    z_spec2 = S.step3_z_indices
-    kx_idx2 = S.step3_kx_indices
-
+    # Scatter reconstructed velocity spectrum back into uc_full without fancy indexing
+    NZ_half = NZ // 2
     uc0p = uc_full[0]
     uc1p = uc_full[1]
 
-    uc0p[z_spec2[:, None], kx_idx2[None, :]] = out1
-    uc1p[z_spec2[:, None], kx_idx2[None, :]] = out2
+    uc0p[0:NZ_half, 0:NX_half] = out1[0:NZ_half, :]
+    uc1p[0:NZ_half, 0:NX_half] = out2[0:NZ_half, :]
+
+    z0 = NZ
+    z1 = NZ + NZ_half
+    uc0p[z0:z1, 0:NX_half] = out1[NZ_half:NZ, :]
+    uc1p[z0:z1, 0:NX_half] = out2[NZ_half:NZ, :]
 
     S.uc_full = uc_full
 
