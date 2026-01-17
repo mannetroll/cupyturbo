@@ -1445,11 +1445,11 @@ def run_dns(
         dns_step2b(S)
         dns_step3(S)
         dns_step2a(S)
-        next_dt(S)
 
         S.t += dt_old
 
         if (it % 100) == 0 or it == 1 or it == STEPS:
+            next_dt(S)
             print(f" ITERATION {it:6d} T={S.t:12.4f} DT={S.dt:10.7f} CN={S.cn:10.7f}")
 
     S.sync()
